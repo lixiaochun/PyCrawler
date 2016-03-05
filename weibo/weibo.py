@@ -22,6 +22,7 @@ IS_SHOW_STEP = False
 TRACE_LOG_PATH = ""
 ERROR_LOG_PATH = ""
 STEP_LOG_PATH = ""
+USER_IDS = []
 
 threadLock = threading.Lock()
 
@@ -116,12 +117,13 @@ class Weibo(robot.Robot):
 
     def main(self):
         global TOTAL_IMAGE_COUNT
+        global USER_IDS
 
         start_time = time.time()
 
         # 图片保存目录
         print_step_msg("创建图片根目录：" + IMAGE_DOWNLOAD_PATH)
-        if not tool.make_dir(IMAGE_DOWNLOAD_PATH, 2):
+        if not tool.make_dir(IMAGE_DOWNLOAD_PATH, 0):
             print_error_msg("创建图片根目录：" + IMAGE_DOWNLOAD_PATH + " 失败，程序结束！")
             tool.process_exit()
 
@@ -163,6 +165,7 @@ class Weibo(robot.Robot):
                     user_id_list[user_id].append("0")
                 if user_id_list[user_id][3] == "":
                     user_id_list[user_id][3] = "0"
+                USER_IDS.append(user_id)
         else:
             print_error_msg("存档文件：" + self.save_data_path + "不存在，程序结束！")
             tool.process_exit()
@@ -187,7 +190,14 @@ class Weibo(robot.Robot):
         for user_id in sorted(user_id_list.keys()):
             # 检查正在运行的线程数
             while threading.activeCount() >= self.thread_count + main_thread_count:
-                time.sleep(10)
+                if tool.is_process_end() == 0:
+                    time.sleep(10)
+                else:
+                    break
+
+            # 提前结束
+            if tool.is_process_end() > 0:
+                break
 
             # 开始下载
             thread = Download(user_id_list[user_id])
@@ -198,6 +208,13 @@ class Weibo(robot.Robot):
         # 检查除主线程外的其他所有线程是不是全部结束了
         while threading.activeCount() > main_thread_count:
             time.sleep(10)
+
+        # 未完成的数据保存
+        if len(USER_IDS) > 0:
+            new_save_data_file = open(NEW_SAVE_DATA_PATH, "a")
+            for user_id in USER_IDS:
+                new_save_data_file.write("\t".join(user_id_list[user_id]) + "\n")
+            new_save_data_file.close()
 
         # 删除临时文件夹
         tool.remove_dir(IMAGE_TEMP_PATH)
@@ -236,6 +253,7 @@ class Download(threading.Thread):
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
         global TOTAL_IMAGE_COUNT
+        global USER_IDS
 
         user_id = self.user_info[0]
         user_name = self.user_info[1]
@@ -260,7 +278,7 @@ class Download(threading.Thread):
                 image_path = os.path.join(IMAGE_TEMP_PATH, user_name)
             else:
                 image_path = os.path.join(IMAGE_DOWNLOAD_PATH, user_name)
-            if not tool.make_dir(image_path, 1):
+            if not tool.make_dir(image_path, 0):
                 print_error_msg(user_name + " 创建图片下载目录：" + image_path + " 失败，程序结束！")
                 tool.process_exit()
 
@@ -377,6 +395,7 @@ class Download(threading.Thread):
             new_save_data_file.write("\t".join(self.user_info) + "\n")
             new_save_data_file.close()
             TOTAL_IMAGE_COUNT += image_count - 1
+            USER_IDS.remove(user_id)
             threadLock.release()
 
             print_step_msg(user_name + " 完成")
