@@ -45,6 +45,13 @@ def print_step_msg(msg):
     threadLock.release()
 
 
+def save_image(image_byte, image_path):
+    image_path = tool.change_path_encoding(image_path)
+    image_file = open(image_path, "wb")
+    image_file.write(image_byte)
+    image_file.close()
+
+
 def visit_weibo(url):
     [temp_page_return_code, temp_page] = tool.http_request(url)[:2]
     if temp_page_return_code == 1:
@@ -272,15 +279,13 @@ class Download(threading.Thread):
                 is_error = False
             else:
                 is_error = True
+            need_make_download_dir = True
 
             # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
             if IS_SORT == 1:
                 image_path = os.path.join(IMAGE_TEMP_PATH, user_name)
             else:
                 image_path = os.path.join(IMAGE_DOWNLOAD_PATH, user_name)
-            if not tool.make_dir(image_path, 0):
-                print_error_msg(user_name + " 创建图片下载目录：" + image_path + " 失败，程序结束！")
-                tool.process_exit()
 
             # 日志文件插入信息
             while 1:
@@ -344,12 +349,15 @@ class Download(threading.Thread):
                                     if file_type.find("/") != -1:
                                         file_type = "jpg"
                                     file_path = os.path.join(image_path, str("%04d" % image_count) + "." + file_type)
-                                    file_path = tool.change_path_encoding(file_path)
-                                    image_file = open(file_path, "wb")
-                                    image_file.write(image_byte)
-                                    image_file.close()
-                                    image_count += 1
+                                    # 第一张图片，创建目录
+                                    if need_make_download_dir:
+                                        if not tool.make_dir(image_path, 0):
+                                            print_error_msg(user_name + " 创建图片下载目录： " + image_path + " 失败，程序结束！")
+                                            tool.process_exit()
+                                        need_make_download_dir = False
+                                    save_image(image_byte, file_path)
                                     print_step_msg(user_name + " 第" + str(image_count) + "张图片下载成功")
+                                    image_count += 1
                                     break
                             if try_count == 5:
                                 print_error_msg(user_name + " 第" + str(image_count) + "张图片 " + image_url + " 下载失败")
@@ -378,7 +386,7 @@ class Download(threading.Thread):
             print_step_msg(user_name + " 下载完毕，总共获得" + str(image_count - 1) + "张图片")
 
             # 排序
-            if IS_SORT == 1:
+            if IS_SORT == 1 and image_count > 1:
                 destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, user_name)
                 if robot.sort_file(image_path, destination_path, int(self.user_info[2]), 4):
                     print_step_msg(user_name + " 图片从下载目录移动到保存目录成功")
