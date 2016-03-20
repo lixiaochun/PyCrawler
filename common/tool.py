@@ -286,8 +286,14 @@ def change_path_encoding(path):
     return path
 
 
-def write_file(msg, file_path):
-    log_file = open(file_path, "a")
+# 写文件
+# type=1: 追加
+# type=2: 覆盖
+def write_file(msg, file_path, append_type=1):
+    if append_type == 1:
+        log_file = open(file_path, "a")
+    else:
+        log_file = open(file_path, "w")
     log_file.write(msg + "\n")
     log_file.close()
 
@@ -302,6 +308,17 @@ def save_image(image_url, image_path):
         image_file.close()
         return True
     return False
+
+
+# 按照指定连接符合并二维数组生成字符串
+def list_to_string(source_lists, first_sign='\n', second_sign='\t'):
+    temp_list = []
+    for value in source_lists:
+        if second_sign != '':
+            temp_list.append(second_sign.join(map(str, value)))
+        else:
+            temp_list.append(str(value))
+    return first_sign.join(temp_list)
 
 
 # order desc 降序

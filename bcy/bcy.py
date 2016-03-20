@@ -97,27 +97,7 @@ class Bcy(robot.Robot):
         # 寻找idlist，如果没有结束进程
         user_id_list = {}
         if os.path.exists(self.save_data_path):
-            save_data_file = open(self.save_data_path, "r")
-            all_user_list = save_data_file.readlines()
-            save_data_file.close()
-            for user_info in all_user_list:
-                if len(user_info) < 3:
-                    continue
-                user_info = user_info.replace("\xef\xbb\xbf", "").replace(" ", "").replace("\n", "").replace("\r", "")
-                user_info_list = user_info.split("\t")
-
-                user_id = user_info_list[0]
-                user_id_list[user_id] = user_info_list
-                # 如果没有数量，则为0
-                if len(user_id_list[user_id]) < 2:
-                    user_id_list[user_id].append("0")
-                if user_id_list[user_id][1] == "":
-                    user_id_list[user_id][1] = "0"
-                # 处理上一次rp id
-                if len(user_id_list[user_id]) < 3:
-                    user_id_list[user_id].append("")
-                if user_id_list[user_id][2] == "":
-                    user_id_list[user_id][2] = "0"
+            user_id_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0"])
         else:
             print_error_msg("用户ID存档文件: " + self.save_data_path + "不存在，程序结束！")
             tool.process_exit()
@@ -159,10 +139,11 @@ class Bcy(robot.Robot):
             user_info = user_info.replace("\xef\xbb\xbf", "").replace("\n", "").replace("\r", "")
             user_info_list = user_info.split("\t")
             user_id_list[user_info_list[0]] = user_info_list
-        new_save_data_file = open(NEW_SAVE_DATA_PATH, "w")
+        new_save_data_file = open(self.save_data_path, "w")
         for user_id in sorted(user_id_list.keys()):
             new_save_data_file.write("\t".join(user_id_list[user_id]) + "\n")
         new_save_data_file.close()
+        os.remove(NEW_SAVE_DATA_PATH)
 
         duration_time = int(time.time() - start_time)
         print_step_msg("全部下载完毕，耗时" + str(duration_time) + "秒，共计图片" + str(TOTAL_IMAGE_COUNT) + "张")
