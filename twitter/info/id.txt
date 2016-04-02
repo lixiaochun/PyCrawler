@@ -2,3 +2,4 @@ mikachi_nu	0		佐伯美香
 yukos_cook	1380	0	菅本裕子
 rei_kusakusa	0	0	山田澪花
 kusakusa_tsugu	0	0	岩永亞美
+enako_rin	9	0	Enako
