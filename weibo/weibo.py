@@ -15,6 +15,7 @@ import os
 import random
 import threading
 import time
+import traceback
 
 USER_IDS = []
 
@@ -273,7 +274,7 @@ class Download(threading.Thread):
                             break
 
                         if "pic_host" in image_info:
-                            image_host = image_info["pic_host"]
+                            image_host = str(image_info["pic_host"])
                         else:
                             image_host = ""
                         for try_count in range(1, 6):
@@ -353,6 +354,7 @@ class Download(threading.Thread):
             print_step_msg(user_name + " 完成")
         except Exception, e:
             print_step_msg(user_name + " 异常")
+            print_error_msg(str(e) + '\n' + str(traceback.print_exc()))
 
 
 if __name__ == "__main__":
