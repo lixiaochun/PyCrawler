@@ -183,17 +183,17 @@ class Download(threading.Thread):
             print_step_msg(user_account + " 开始")
 
             # 初始化数据
-            last_image_time = self.user_info[2]
+            last_image_time = int(self.user_info[2])
             self.user_info[2] = "0"  # 置空，存放此次的最后图片上传时间
             data_tweet_id = INIT_MAX_ID
             image_count = 1
             image_url_list = []
             is_over = False
             # 如果有存档记录，则直到找到在记录之前的图片，否则都算错误
-            if last_image_time == "0":
-                is_error = False
-            else:
-                is_error = True
+            # if last_image_time == "0":
+            #     is_error = False
+            # else:
+            #     is_error = True
             need_make_download_dir = True
 
             # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
@@ -246,9 +246,9 @@ class Download(threading.Thread):
                             self.user_info[2] = str(image_time)
 
                         # 检查是否已下载到前一次的图片
-                        if 0 < int(last_image_time) >= image_time:
+                        if 0 < last_image_time >= image_time:
                             is_over = True
-                            is_error = False
+                            # is_error = False
                             break
 
                         # 文件类型
@@ -272,7 +272,7 @@ class Download(threading.Thread):
                     # 达到配置文件中的下载数量，结束
                     if 0 < GET_IMAGE_COUNT < image_count:
                         is_over = True
-                        is_error = False
+                        # is_error = False
                         break
 
                 if is_over:
@@ -285,8 +285,8 @@ class Download(threading.Thread):
                     break
 
             # 如果有错误且没有发现新的图片，复原旧数据
-            if self.user_info[2] == "0" and last_image_time != "0":
-                self.user_info[2] = last_image_time
+            if self.user_info[2] == "0" and last_image_time != 0:
+                self.user_info[2] = str(last_image_time)
 
             print_step_msg(user_account + " 下载完毕，总共获得" + str(image_count - 1) + "张图片")
 
@@ -301,8 +301,8 @@ class Download(threading.Thread):
 
             self.user_info[1] = str(int(self.user_info[1]) + image_count - 1)
 
-            if is_error:
-                print_error_msg(user_account + " 图片数量异常，请手动检查")
+            # if is_error:
+            #     print_error_msg(user_account + " 图片数量异常，请手动检查")
 
             # 保存最后的信息
             threadLock.acquire()

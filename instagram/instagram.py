@@ -167,22 +167,16 @@ class Download(threading.Thread):
         print_step_msg(user_account + " 开始")
 
         # 初始化数据
-        last_created_time = self.user_info[2]
+        last_created_time = int(self.user_info[2])
         self.user_info[2] = ""
-        # 为防止前一次的记录图片被删除，根据历史图片总数给一个单次下载的数量限制
-        if last_created_time == "0":
-            limit_download_count = 0
-        else:
-            # 历史总数的10%，下线50、上限300
-            limit_download_count = min(max(50, int(self.user_info[1]) / 100 * 10), 300)
         image_id = ""
         image_count = 1
         is_over = False
         # 如果有存档记录，则直到找到与前一次一致的地址，否则都算有异常
-        if last_created_time != "0":
-            is_error = True
-        else:
-            is_error = False
+        # if last_created_time != "0":
+        #     is_error = True
+        # else:
+        #     is_error = False
         need_make_download_dir = True
 
         # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
@@ -210,7 +204,7 @@ class Download(threading.Thread):
             if not isinstance(photo_album_page, dict):
                 print_error_msg(user_account + " JSON数据：" + str(photo_album_page) + " 不是一个字典")
                 break
-            if not photo_album_page.has_key("items"):
+            if "items" not in photo_album_page:
                 print_error_msg(user_account + " 在JSON数据：" + str(photo_album_page) + " 中没有找到'items'字段")
                 break
 
@@ -219,13 +213,13 @@ class Download(threading.Thread):
                 is_over = True
             else:
                 for photo_info in photo_album_page["items"]:
-                    if not photo_info.has_key("images"):
+                    if "images" not in photo_info:
                         print_error_msg(user_account + " 在JSON数据：" + str(photo_info) + " 中没有找到'images'字段")
                         break
-                    if not photo_info.has_key("created_time"):
+                    if "created_time" not in photo_info:
                         print_error_msg(user_account + " 在JSON数据：" + str(photo_info) + " 中没有找到'created_time'字段")
                         break
-                    if not photo_info.has_key("id"):
+                    if "id" not in photo_info:
                         print_error_msg(user_account + " 在JSON数据：" + str(photo_info) + " 中没有找到'id'字段")
                         break
                     else:
@@ -233,18 +227,18 @@ class Download(threading.Thread):
 
                     # 将第一张image的created_time保存到新id list中
                     if self.user_info[2] == "":
-                        self.user_info[2] = photo_info["created_time"]
+                        self.user_info[2] = str(photo_info["created_time"])
 
                     # 检查是否已下载到前一次的图片
-                    if int(photo_info["created_time"]) <= last_created_time:
+                    if 0 < last_created_time >= int(photo_info["created_time"]):
                         is_over = True
-                        is_error = False
+                        # is_error = False
                         break
 
-                    if not photo_info["images"].has_key("standard_resolution"):
+                    if "standard_resolution" not in photo_info["images"]:
                         print_error_msg(user_account + " 在JSON数据：" + str(photo_info["images"]) + " 中没有找到'standard_resolution'字段, image id: " + image_id)
                         break
-                    if not photo_info["images"]["standard_resolution"].has_key("url"):
+                    if "url" not in photo_info["images"]["standard_resolution"]:
                         print_error_msg(user_account + " 在JSON数据：" + str(photo_info["images"]["standard_resolution"]) + " 中没有找到'url'字段, image id: " + image_id)
                         break
 
@@ -268,15 +262,10 @@ class Download(threading.Thread):
                     else:
                         print_error_msg(user_account + " 第" + str(image_count) + "张图片 " + image_url + " 下载失败")
 
-                    # 达到下载数量限制，结束
-                    if limit_download_count > 0 and image_count > limit_download_count:
-                        is_over = True
-                        break
-
                     # 达到配置文件中的下载数量，结束
-                    if GET_IMAGE_COUNT > 0 and image_count > GET_IMAGE_COUNT:
+                    if 0 < GET_IMAGE_COUNT < image_count:
                         is_over = True
-                        is_error = False
+                        # is_error = False
                         break
 
             if is_over:
@@ -308,8 +297,8 @@ class Download(threading.Thread):
 
         self.user_info[1] = str(int(self.user_info[1]) + image_count - 1)
 
-        if is_error:
-            print_error_msg(user_account + " 图片数量异常，请手动检查")
+        # if is_error:
+        #     print_error_msg(user_account + " 图片数量异常，请手动检查")
 
         # 保存最后的信息
         threadLock.acquire()
