@@ -14,7 +14,11 @@ import re
 import threading
 import time
 
-THREAD_COUNT = 0
+USER_IDS = []
+TOTAL_IMAGE_COUNT = 0
+IMAGE_DOWNLOAD_PATH = ''
+NEW_SAVE_DATA_PATH = ''
+IS_DOWNLOAD_IMAGE = 1
 
 threadLock = threading.Lock()
 
@@ -39,24 +43,25 @@ def trace(msg):
 
 class Bcy(robot.Robot):
     def __init__(self):
-        global GET_IMAGE_COUNT
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
+        global IS_DOWNLOAD_IMAGE
 
         super(Bcy, self).__init__()
 
         # 全局变量
-        GET_IMAGE_COUNT = self.get_image_count
         IMAGE_DOWNLOAD_PATH = self.image_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
+        IS_DOWNLOAD_IMAGE = self.is_download_image
 
         tool.print_msg("配置文件读取完成")
 
     def main(self):
-        global TOTAL_IMAGE_COUNT
-        global THREAD_COUNT
+        global USER_IDS
+
+        if IS_DOWNLOAD_IMAGE == 0:
+            print_error_msg("下载图片没开启，请检查配置！")
+            tool.process_exit()
 
         start_time = time.time()
 
@@ -79,6 +84,7 @@ class Bcy(robot.Robot):
         user_id_list = {}
         if os.path.exists(self.save_data_path):
             user_id_list = robot.read_save_data(self.save_data_path, 0, ["", "", "0"])
+            USER_IDS = user_id_list.keys()
         else:
             print_error_msg("用户ID存档文件: " + self.save_data_path + "不存在，程序结束！")
             tool.process_exit()
@@ -87,17 +93,16 @@ class Bcy(robot.Robot):
         new_save_data_file = open(NEW_SAVE_DATA_PATH, "w")
         new_save_data_file.close()
 
-        TOTAL_IMAGE_COUNT = 0
         # 循环下载每个id
+        main_thread_count = threading.activeCount()
         for user_id in sorted(user_id_list.keys()):
             # 检查正在运行的线程数
-            while THREAD_COUNT >= self.thread_count:
+            while threading.activeCount() >= self.thread_count + main_thread_count:
                 time.sleep(10)
 
-            # 线程数+1
-            threadLock.acquire()
-            THREAD_COUNT += 1
-            threadLock.release()
+            # 提前结束
+            if tool.is_process_end() > 0:
+                break
 
             # 开始下载
             thread = Download(user_id_list[user_id])
@@ -105,9 +110,16 @@ class Bcy(robot.Robot):
 
             time.sleep(1)
 
-        # 检查所有线程是不是全部结束了
-        while THREAD_COUNT != 0:
+        # 检查除主线程外的其他所有线程是不是全部结束了
+        while threading.activeCount() > main_thread_count:
             time.sleep(10)
+
+        # 未完成的数据保存
+        if len(USER_IDS) > 0:
+            new_save_data_file = open(NEW_SAVE_DATA_PATH, "a")
+            for user_id in USER_IDS:
+                new_save_data_file.write("\t".join(user_id_list[user_id]) + "\n")
+            new_save_data_file.close()
 
         # 重新排序保存存档文件
         user_id_list = robot.read_save_data(NEW_SAVE_DATA_PATH, 0, [])
@@ -125,12 +137,7 @@ class Download(threading.Thread):
         self.user_info = user_info
 
     def run(self):
-        global GET_IMAGE_COUNT
-        global IMAGE_DOWNLOAD_PATH
-        global NEW_SAVE_DATA_PATH
-        global IS_SORT
         global TOTAL_IMAGE_COUNT
-        global THREAD_COUNT
 
         coser_id = self.user_info[0]
         cn = self.user_info[1]
@@ -275,6 +282,7 @@ class Download(threading.Thread):
             threadLock.acquire()
             tool.write_file("\t".join(self.user_info), NEW_SAVE_DATA_PATH)
             TOTAL_IMAGE_COUNT += this_cn_total_image_count
+            USER_IDS.remove(coser_id)
             threadLock.release()
 
             print_step_msg(cn + " 完成")
