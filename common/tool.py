@@ -9,11 +9,13 @@ import cookielib
 import cStringIO
 import os
 import platform
+import random
 import shutil
 import sys
 import time
 import threading
 import traceback
+import urllib
 import urllib2
 
 IS_SET_TIMEOUT = False
@@ -67,7 +69,7 @@ def restore_process_status():
 def http_request(url, post_data=None):
     global IS_SET_TIMEOUT
     global PROCESS_STATUS
-    if url.find("http://") == -1 and url.find("https://") == -1:
+    if not (url.find("http://") == 0 or url.find("https://") == 0):
         return [-100, None, []]
     count = 0
     while 1:
@@ -75,6 +77,8 @@ def http_request(url, post_data=None):
             time.sleep(10)
         try:
             if post_data:
+                if isinstance(post_data, dict):
+                    post_data = urllib.urlencode(post_data)
                 request = urllib2.Request(url, post_data)
             else:
                 request = urllib2.Request(url)
@@ -164,7 +168,7 @@ def get_default_browser_cookie_path(browser_type):
 # browser_type=1: IE
 # browser_type=2: firefox
 # browser_type=3: chrome
-def set_cookie(file_path, browser_type=1):
+def set_cookie(file_path, browser_type=1, target_domains=''):
     if sys.version.find("32 bit") != -1:
         from pysqlite2_win32 import dbapi2 as sqlite
     else:
@@ -184,44 +188,58 @@ def set_cookie(file_path, browser_type=1):
             cookie_file.close()
             for cookies in cookie_info.split("*"):
                 cookie_list = cookies.strip("\n").split("\n")
-                if len(cookie_list) >= 8:
-                    domain = cookie_list[2].split("/")[0]
-                    domain_specified = ftstr[cookie_list[2].startswith(".")]
-                    path = cookie_list[2].replace(domain, "")
-                    secure = ftstr[0]
-                    expires = cookie_list[4]
-                    name = cookie_list[0]
-                    value = cookie_list[1]
-                    s.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (domain, domain_specified, path, secure, expires, name, value))
+                if len(cookie_list) < 8:
+                    continue
+                domain = cookie_list[2].split("/")[0]
+                if _filter_domain(domain, target_domains):
+                    continue
+                domain_specified = ftstr[cookie_list[2].startswith(".")]
+                path = cookie_list[2].replace(domain, "")
+                secure = ftstr[0]
+                expires = cookie_list[4]
+                name = cookie_list[0]
+                value = cookie_list[1]
+                s.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (domain, domain_specified, path, secure, expires, name, value))
     elif browser_type == 2:
         con = sqlite.connect(os.path.join(file_path, "cookies.sqlite"))
         cur = con.cursor()
         cur.execute("select host, path, isSecure, expiry, name, value from moz_cookies")
         for cookie_info in cur.fetchall():
             domain = cookie_info[0]
+            if _filter_domain(domain, target_domains):
+                continue
             domain_specified = ftstr[cookie_info[0].startswith(".")]
             path = cookie_info[1]
             secure = ftstr[cookie_info[2]]
             expires = cookie_info[3]
             name = cookie_info[4]
             value = cookie_info[5]
-            #s.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (domain, domain_specified, path, secure, expires, name, value))
             try:
                 s.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (domain, domain_specified, path, secure, expires, name, value))
             except:
                 pass
     elif browser_type == 3:
+        try:
+            import win32crypt
+        except:
+            pass
         con = sqlite.connect(os.path.join(file_path, "Cookies"))
         cur = con.cursor()
-        cur.execute("select host_key, path, secure, expires_utc, name, value from cookies")
+        cur.execute("select host_key, path, secure, expires_utc, name, value, encrypted_value from cookies")
         for cookie_info in cur.fetchall():
             domain = cookie_info[0]
+            if _filter_domain(domain, target_domains):
+                continue
             domain_specified = ftstr[cookie_info[0].startswith(".")]
             path = cookie_info[1]
             secure = ftstr[cookie_info[2]]
             expires = cookie_info[3]
             name = cookie_info[4]
             value = cookie_info[5]
+            try:
+                value = win32crypt.CryptUnprotectData(cookie_info[6], None, None, None, 0)[1]
+            except:
+                pass
             try:
                 s.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (domain, domain_specified, path, secure, expires, name, value))
             except:
@@ -232,6 +250,23 @@ def set_cookie(file_path, browser_type=1):
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie_jar))
     urllib2.install_opener(opener)
     return True
+
+
+# 是否需要过滤这个域的cookie
+# return True - 过滤，不需要加载
+# return False - 不过滤，需要加载
+def _filter_domain(domain, target_domains):
+    if target_domains:
+        if isinstance(target_domains, str):
+            if domain.find(target_domains) > 0:
+                return False
+        else:
+            for target_domain in target_domains:
+                if domain.find(target_domain) >= 0:
+                    return False
+        return True
+    else:
+        return False
 
 
 # 设置代理
@@ -426,6 +461,31 @@ def copy_files(source_path, destination_path):
     source_path = change_path_encoding(source_path)
     destination_path = change_path_encoding(destination_path)
     shutil.copyfile(source_path, destination_path)
+
+
+# 生成指定长度的随机字符串
+# char_lib_type 需要的字库取和， 1 - 大写字母；2 - 小写字母; 3 - 数字，默认7(1+2+3)包括全部
+def generate_random_string(string_length, char_lib_type=7):
+    result = ''
+    char_lib = {
+        1: 'abcdefghijklmnopqrstuvwxyz',  # 小写字母
+        2: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',  # 大写字母
+        4: '0123456789',  # 数字
+    }
+    random_string = ''
+    for i in char_lib:
+        if char_lib_type & i == i:
+            for char in char_lib[i]:
+                random_string += char
+
+    if not random_string:
+        return result
+
+    length = len(random_string) - 1
+    for i in range(0, string_length):
+        result += random_string[random.randint(0, length)]
+
+    print result
 
 
 # 结束进程
