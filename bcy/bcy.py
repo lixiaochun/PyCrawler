@@ -9,6 +9,7 @@ email: hikaru870806@hotmail.com
 '''
 
 from common import log, robot, tool
+import cookielib
 import os
 import re
 import threading
@@ -17,8 +18,8 @@ import traceback
 
 ACCOUNTS = []
 TOTAL_IMAGE_COUNT = 0
-IMAGE_DOWNLOAD_PATH = ''
-NEW_SAVE_DATA_PATH = ''
+IMAGE_DOWNLOAD_PATH = ""
+NEW_SAVE_DATA_PATH = ""
 IS_DOWNLOAD_IMAGE = 1
 
 threadLock = threading.Lock()
@@ -40,6 +41,17 @@ def trace(msg):
     threadLock.acquire()
     log.trace(msg)
     threadLock.release()
+
+
+def login(email, password):
+    cookie = cookielib.CookieJar()
+    login_url = "http://bcy.net/public/dologin"
+    login_post = {"email": email, "password": password}
+    login_return_code = tool.http_request(login_url, login_post, cookie)[0]
+    if login_return_code == 0:
+        return True
+    else:
+        return False
 
 
 class Bcy(robot.Robot):
@@ -77,7 +89,7 @@ class Bcy(robot.Robot):
             tool.set_proxy(self.proxy_ip, self.proxy_port, "http")
 
         # 设置系统cookies
-        if not tool.set_cookie(self.cookie_path, self.browser_version, 'bcy.net'):
+        if not tool.set_cookie(self.cookie_path, self.browser_version, "bcy.net"):
             print_error_msg("导入浏览器cookies失败，程序结束！")
             tool.process_exit()
 
@@ -88,7 +100,6 @@ class Bcy(robot.Robot):
             if (home_page_url != real_url) or ("http://bcy.net/start" == real_url):
                 is_check_ok = False
                 while not is_check_ok:
-                    # 等待手动检测所有图片结束
                     input_str = raw_input(tool.get_time() + " 没有检测到您的账号信息，可能无法获取那些只对粉丝开放的隐藏作品，是否下一步操作？ (Y)es or (N)o: ")
                     input_str = input_str.lower()
                     if input_str in ["y", "yes"]:
@@ -99,7 +110,8 @@ class Bcy(robot.Robot):
         # 寻找idlist，如果没有结束进程
         account_list = {}
         if os.path.exists(self.save_data_path):
-            account_list = robot.read_save_data(self.save_data_path, 0, ["", "", "0"])
+            # account_id  last_rp_id
+            account_list = robot.read_save_data(self.save_data_path, 0, ["", "0"])
             ACCOUNTS = account_list.keys()
         else:
             print_error_msg("用户ID存档文件: " + self.save_data_path + "不存在，程序结束！")
@@ -156,13 +168,16 @@ class Download(threading.Thread):
         global TOTAL_IMAGE_COUNT
 
         coser_id = self.account_info[0]
-        cn = self.account_info[1]
+        if len(self.account_info) >= 3:
+            cn = self.account_info[2]
+        else:
+            cn = self.account_info[0]
 
         try:
             print_step_msg(cn + " 开始")
 
-            last_rp_id = self.account_info[2]
-            self.account_info[2] = ""  # 置空，存放此次的最后rp id
+            last_rp_id = self.account_info[1]
+            self.account_info[1] = ""  # 置空，存放此次的最后rp id
             this_cn_total_image_count = 0
             page_count = 1
             max_page_count = -1
@@ -196,8 +211,8 @@ class Download(threading.Thread):
                     rp_id = data[1]
                     rp_id_list.append(rp_id)
 
-                    if self.account_info[2] == "":
-                        self.account_info[2] = rp_id
+                    if self.account_info[1] == "":
+                        self.account_info[1] = rp_id
                     # 检查是否已下载到前一次的图片
                     if int(rp_id) <= int(last_rp_id):
                         is_over = True
@@ -286,8 +301,8 @@ class Download(threading.Thread):
                 page_count += 1
 
             # 如果有错误且没有发现新的图片，复原旧数据
-            if self.account_info[2] == "" and last_rp_id != "0":
-                self.account_info[2] = str(last_rp_id)
+            if self.account_info[1] == "" and last_rp_id != "0":
+                self.account_info[1] = str(last_rp_id)
 
             print_step_msg(cn + " 下载完毕，总共获得" + str(this_cn_total_image_count) + "张图片")
 

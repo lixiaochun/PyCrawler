@@ -7,6 +7,7 @@ Created on 2013-7-16
 
 import cookielib
 import cStringIO
+import mimetools
 import os
 import platform
 import random
@@ -57,20 +58,20 @@ def is_process_end():
 
 
 def restore_process_status():
-    for file_name in ['pause', 'stop', 'finish']:
+    for file_name in ["pause", "stop", "finish"]:
         file_path = os.path.join(os.path.abspath(".."), file_name)
         if os.path.exists(file_path):
             os.remove(file_path)
 
 
 # http请求
-# 返回 【返回码，数据, 请求信息】
+# 返回 【返回码，数据, response】
 # 返回码 1：正常返回；-1：无法访问；-100：URL格式不正确；其他< 0：网页返回码
-def http_request(url, post_data=None):
+def http_request(url, post_data=None, cookie=None):
     global IS_SET_TIMEOUT
     global PROCESS_STATUS
     if not (url.find("http://") == 0 or url.find("https://") == 0):
-        return [-100, None, []]
+        return [-100, None, None]
     count = 0
     while 1:
         while PROCESS_STATUS == ProcessControl.PROCESS_PAUSE:
@@ -85,10 +86,10 @@ def http_request(url, post_data=None):
             # 设置头信息
             request.add_header("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:41.0) Gecko/20100101 Firefox/41.0")
 
-            # cookie
-            # cookie = cookielib.CookieJar()
-            # opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
-            # urllib2.install_opener(opener)
+            # cookies
+            if isinstance(cookie, cookielib.CookieJar):
+                opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
+                urllib2.install_opener(opener)
 
             # 设置访问超时
             if sys.version_info < (2, 7):
@@ -98,6 +99,7 @@ def http_request(url, post_data=None):
                 response = urllib2.urlopen(request)
             else:
                 response = urllib2.urlopen(request, timeout=5)
+                response.geturl()
             return [1, response.read(), response]
         except Exception, e:
             # 代理无法访问
@@ -116,13 +118,13 @@ def http_request(url, post_data=None):
                 print_msg("访问页面超时，重新连接请稍后")
             # 400
             elif str(e).lower().find("http error 400") != -1:
-                return [-400, None, []]
+                return [-400, None, None]
             # 403
             elif str(e).lower().find("http error 403") != -1:
-                return [-403, None, []]
+                return [-403, None, None]
             # 404
             elif str(e).lower().find("http error 404") != -1:
-                return [-404, None, []]
+                return [-404, None, None]
             else:
                 print_msg(str(e))
                 traceback.print_exc()
@@ -130,15 +132,13 @@ def http_request(url, post_data=None):
         count += 1
         if count > 500:
             print_msg("无法访问页面：" + url)
-            return [-1, None, []]
+            return [-1, None, None]
 
 
-def get_response_info(response, key):
-    try:
-        if key in response:
-            return response[key]
-    except:
-        pass
+def get_response_info(response_info, key):
+    if isinstance(response_info, mimetools.Message):
+        if key in response_info:
+            return response_info[key]
     return None
 
 
@@ -167,7 +167,7 @@ def get_default_browser_cookie_path(browser_type):
 # browser_type=1: IE
 # browser_type=2: firefox
 # browser_type=3: chrome
-def set_cookie(file_path, browser_type=1, target_domains=''):
+def set_cookie(file_path, browser_type=1, target_domains=""):
     if sys.version.find("32 bit") != -1:
         from pysqlite2_win32 import dbapi2 as sqlite
     else:
@@ -326,10 +326,10 @@ def save_image(image_url, image_path):
 
 
 # 按照指定连接符合并二维数组生成字符串
-def list_to_string(source_lists, first_sign='\n', second_sign='\t'):
+def list_to_string(source_lists, first_sign="\n", second_sign="\t"):
     temp_list = []
     for value in source_lists:
-        if second_sign != '':
+        if second_sign != "":
             temp_list.append(second_sign.join(map(str, value)))
         else:
             temp_list.append(str(value))
@@ -433,13 +433,13 @@ def copy_files(source_path, destination_path):
 # 生成指定长度的随机字符串
 # char_lib_type 需要的字库取和， 1 - 大写字母；2 - 小写字母; 3 - 数字，默认7(1+2+3)包括全部
 def generate_random_string(string_length, char_lib_type=7):
-    result = ''
+    result = ""
     char_lib = {
-        1: 'abcdefghijklmnopqrstuvwxyz',  # 小写字母
-        2: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',  # 大写字母
-        4: '0123456789',  # 数字
+        1: "abcdefghijklmnopqrstuvwxyz",  # 小写字母
+        2: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",  # 大写字母
+        4: "0123456789",  # 数字
     }
-    random_string = ''
+    random_string = ""
     for i in char_lib:
         if char_lib_type & i == i:
             for char in char_lib[i]:
@@ -462,6 +462,6 @@ def process_exit():
 
 def shutdown():
     if platform.system() == "Windows":
-        os.system('shutdown -s -f -t 3')
+        os.system("shutdown -s -f -t 3")
     else:
-        os.system('halt')
+        os.system("halt")

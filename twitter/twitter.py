@@ -15,16 +15,17 @@ import re
 import threading
 import time
 import traceback
+import urllib2
 
 ACCOUNTS = []
 INIT_MAX_ID = "999999999999999999"
 TOTAL_IMAGE_COUNT = 0
 GET_IMAGE_COUNT = 0
-IMAGE_TEMP_PATH = ''
-IMAGE_DOWNLOAD_PATH = ''
-VIDEO_TEMP_PATH = ''
-VIDEO_DOWNLOAD_PATH = ''
-NEW_SAVE_DATA_PATH = ''
+IMAGE_TEMP_PATH = ""
+IMAGE_DOWNLOAD_PATH = ""
+VIDEO_TEMP_PATH = ""
+VIDEO_DOWNLOAD_PATH = ""
+NEW_SAVE_DATA_PATH = ""
 IS_SORT = 1
 IS_DOWNLOAD_IMAGE = 1
 
@@ -50,10 +51,13 @@ def trace(msg):
 
 
 # 返回的是当前时区对应的时间
-def get_image_last_modified(info):
-    last_modified_time = tool.get_response_info(info, "last-modified")
-    last_modified_time = time.strptime(last_modified_time, "%a, %d %b %Y %H:%M:%S %Z")
-    return int(time.mktime(last_modified_time)) - time.timezone
+def get_image_last_modified(response):
+    if isinstance(response, urllib2.addinfourl):
+        info = response.info()
+        last_modified_time = tool.get_response_info(info, "last-modified")
+        last_modified_time = time.strptime(last_modified_time, "%a, %d %b %Y %H:%M:%S %Z")
+        return int(time.mktime(last_modified_time)) - time.timezone
+    return 0
 
 
 def save_image(image_byte, image_path):
