@@ -449,7 +449,7 @@ class Download(threading.Thread):
                     print_error_msg(account_name + " 返回的图片列表不是一个JSON数据")
                     break
 
-                if not robot.check_sub_key("data", page):
+                if not robot.check_sub_key(("data", ), page):
                     print_error_msg(account_name + " 图片列表解析错误")
                     break
                 if not robot.check_sub_key(("total", "photo_list"), page["data"]):
@@ -487,16 +487,17 @@ class Download(threading.Thread):
                             print_step_msg(account_name + " 重试下载第" + str(image_count) + "张图片：" + image_url)
                         image_byte = get_image_byte(image_url)
                         if image_byte:
-                            file_type = image_url.split(".")[-1]
-                            if file_type.find("/") != -1:
-                                file_type = "jpg"
-                            file_path = os.path.join(image_path, str("%04d" % image_count) + "." + file_type)
                             # 第一张图片，创建目录
                             if need_make_image_dir:
                                 if not tool.make_dir(image_path, 0):
                                     print_error_msg(account_name + " 创建图片下载目录： " + image_path + " 失败，程序结束！")
                                     tool.process_exit()
                                 need_make_image_dir = False
+
+                            file_type = image_url.split(".")[-1]
+                            if file_type.find("/") != -1:
+                                file_type = "jpg"
+                            file_path = os.path.join(image_path, str("%04d" % image_count) + "." + file_type)
                             save_image(image_byte, file_path)
                             print_step_msg(account_name + " 第" + str(image_count) + "张图片下载成功")
                             image_count += 1
