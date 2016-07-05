@@ -129,6 +129,7 @@ def find_real_video_url(video_page_url, account_name, video_count):
         return ["http://wsqncdn.miaopai.com/stream/%s.mp4" % video_id]
     # http://video.weibo.com/show?fid=1034:e608e50d5fa95410748da61a7dfa2bff
     elif video_page_url.find("video.weibo.com/show?fid=") >= 0:  # 微博视频
+        # 多次尝试，在多线程访问的时候有较大几率无法返回正确的信息
         for i in range(0, 50):
             source_video_page = visit_weibo(video_page_url)
             if source_video_page:
@@ -166,16 +167,15 @@ def find_real_video_url(video_page_url, account_name, video_count):
             video_id = re.findall('<div class="vBox js_player"[\s]*id="([^"]*)"', source_video_page)
             if len(video_id) == 1:
                 video_page_id = video_page_url.split("/")[-1]
-                video_id = video_id[0]
-                video_info_url = "http://wsi.weishi.com/weishi/video/downloadVideo.php?vid=%s&device=1&id=%s" % (video_id, video_page_id)
+                video_info_url = "http://wsi.weishi.com/weishi/video/downloadVideo.php?vid=%s&device=1&id=%s" % (video_id[0], video_page_id)
                 [video_info_page_return_code, video_info_page] = tool.http_request(video_info_url)[:2]
                 if video_info_page_return_code == 1:
                     try:
                         video_info_page = json.loads(video_info_page)
-                        if "data" in video_info_page:
-                            if "url" in video_info_page["data"]:
+                        if robot.check_sub_key(("data", ), video_info_page):
+                            if robot.check_sub_key(("url", ), video_info_page["data"]):
                                 return [random.choice(video_info_page["data"]["url"])]
-                    except:
+                    except AttributeError:
                         pass
             print_error_msg(account_name + " 第" + video_count + "个视频：" + video_page_url + "没有获取到源地址")
         else:
@@ -186,6 +186,7 @@ def find_real_video_url(video_page_url, account_name, video_count):
     return []
 
 
+# 访问图片源地址，判断是不是图片已经被删除或暂时无法访问后，返回图片字节
 def get_image_byte(image_url):
     [image_return_code, image_data] = tool.http_request(image_url)[:2]
     if image_return_code == 1:
@@ -202,6 +203,7 @@ class Weibo(robot.Robot):
     def __init__(self, save_data_path="", this_image_download_path="", this_image_temp_path="",
                  this_video_download_path="", this_video_temp_path=""):
         global GET_IMAGE_COUNT
+        global GET_VIDEO_COUNT
         global IMAGE_TEMP_PATH
         global IMAGE_DOWNLOAD_PATH
         global VIDEO_TEMP_PATH
@@ -217,6 +219,7 @@ class Weibo(robot.Robot):
             self.save_data_path = save_data_path
 
         GET_IMAGE_COUNT = self.get_image_count
+        GET_VIDEO_COUNT = self.get_video_count
         if this_image_temp_path != "":
             IMAGE_TEMP_PATH = this_image_temp_path
         else:
@@ -363,12 +366,6 @@ class Download(threading.Thread):
             self.account_info[2] = "0"  # 置空，存放此次的最后图片上传时间
             last_video_url = self.account_info[4]
             self.account_info[4] = ""  # 置空，存放此次的的最后一个视频地址
-            page_count = 1
-            image_count = 1
-            video_count = 1
-            since_id = INIT_SINCE_ID
-            need_make_image_dir = True
-            need_make_video_dir = True
 
             # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
             if IS_SORT == 1:
@@ -379,9 +376,12 @@ class Download(threading.Thread):
                 video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
 
             # 视频
+            video_count = 1
             page_id = 0
             is_over = False
-            while IS_DOWNLOAD_VIDEO == 1:
+            need_make_video_dir = True
+            since_id = INIT_SINCE_ID
+            while (IS_DOWNLOAD_VIDEO == 1) and (not is_over):
                 if not page_id:
                     page_id = get_weibo_account_page_id(account_id)
                     if not page_id:
@@ -420,14 +420,17 @@ class Download(threading.Thread):
                         else:
                             print_error_msg(account_name + " 第" + str(video_count) + "个视频 " + video_page_url + " 下载失败")
 
-                if is_over:
-                    break
+                    # 达到配置文件中的下载数量，结束
+                    if 0 < GET_VIDEO_COUNT < video_count:
+                        is_over = True
+                        break
 
-                since_id_data = re.findall('action-data="type=video&owner_uid=&since_id=([\d]*)">', video_page_data)
-                if len(since_id_data) == 1:
-                    since_id = since_id_data[0]
-                else:
-                    break
+                if not is_over:
+                    since_id_data = re.findall('action-data="type=video&owner_uid=&since_id=([\d]*)">', video_page_data)
+                    if len(since_id_data) == 1:
+                        since_id = since_id_data[0]
+                    else:
+                        break
 
             if video_count > 1 and last_video_url != "" and not is_over:
                 print_error_msg(account_name + " 视频数量异常")
@@ -437,8 +440,11 @@ class Download(threading.Thread):
                 self.account_info[4] = last_video_url
 
             # 图片
+            image_count = 1
+            page_count = 1
             is_over = False
-            while IS_DOWNLOAD_IMAGE == 1:
+            need_make_image_dir = True
+            while (IS_DOWNLOAD_IMAGE == 1) and (not is_over):
                 photo_page_url = "http://photo.weibo.com/photos/get_all"
                 photo_page_url += "?uid=%s&count=%s&page=%s&type=3" % (account_id, IMAGE_COUNT_PER_PAGE, page_count)
                 photo_page_data = visit_weibo(photo_page_url)
@@ -449,11 +455,11 @@ class Download(threading.Thread):
                     print_error_msg(account_name + " 返回的图片列表不是一个JSON数据")
                     break
 
-                if not robot.check_sub_key(("data", ), page):
-                    print_error_msg(account_name + " 图片列表解析错误")
+                if not robot.check_sub_key("data", page):
+                    print_error_msg(account_name + " 图片列表解析错误" + str(page))
                     break
                 if not robot.check_sub_key(("total", "photo_list"), page["data"]):
-                    print_error_msg(account_name + " 图片列表解析错误")
+                    print_error_msg(account_name + " 图片列表解析错误"  + str(page))
                     break
 
                 # 总的图片数
@@ -487,17 +493,16 @@ class Download(threading.Thread):
                             print_step_msg(account_name + " 重试下载第" + str(image_count) + "张图片：" + image_url)
                         image_byte = get_image_byte(image_url)
                         if image_byte:
+                            file_type = image_url.split(".")[-1]
+                            if file_type.find("/") != -1:
+                                file_type = "jpg"
+                            file_path = os.path.join(image_path, str("%04d" % image_count) + "." + file_type)
                             # 第一张图片，创建目录
                             if need_make_image_dir:
                                 if not tool.make_dir(image_path, 0):
                                     print_error_msg(account_name + " 创建图片下载目录： " + image_path + " 失败，程序结束！")
                                     tool.process_exit()
                                 need_make_image_dir = False
-
-                            file_type = image_url.split(".")[-1]
-                            if file_type.find("/") != -1:
-                                file_type = "jpg"
-                            file_path = os.path.join(image_path, str("%04d" % image_count) + "." + file_type)
                             save_image(image_byte, file_path)
                             print_step_msg(account_name + " 第" + str(image_count) + "张图片下载成功")
                             image_count += 1
@@ -511,14 +516,12 @@ class Download(threading.Thread):
                         is_over = True
                         break
 
-                if is_over:
-                    break
-
-                if (total_image_count / IMAGE_COUNT_PER_PAGE) > (page_count - 1):
-                    page_count += 1
-                else:
-                    # 全部图片下载完毕
-                    break
+                if not is_over:
+                    if (total_image_count / IMAGE_COUNT_PER_PAGE) > (page_count - 1):
+                        page_count += 1
+                    else:
+                        # 全部图片下载完毕
+                        break
 
             # 如果有错误且没有发现新的图片，复原旧数据
             if self.account_info[2] == "0" and last_image_time != 0:

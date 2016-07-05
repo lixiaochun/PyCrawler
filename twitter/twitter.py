@@ -209,7 +209,7 @@ class Download(threading.Thread):
                 image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_id)
 
             # 图片下载
-            while True:
+            while not is_over:
                 media_page_url = "https://twitter.com/i/profiles/show/%s/media_timeline?include_available_features=1" \
                                  "&include_entities=1&max_position=%s" % (account_id, data_tweet_id)
 
@@ -219,21 +219,12 @@ class Download(threading.Thread):
                     break
                 try:
                     media_page = json.loads(media_page_response)
-                except:
+                except AttributeError:
                     print_error_msg(account_id + " 返回信息：" + str(media_page_response) + " 不是一个JSON数据")
                     break
 
-                if not isinstance(media_page, dict):
-                    print_error_msg(account_id + " JSON数据：" + str(media_page) + " 不是一个字典")
-                    break
-                if "has_more_items" not in media_page:
-                    print_error_msg(account_id + " 在JSON数据：" + str(media_page) + " 中没有找到'has_more_items'字段")
-                    break
-                if "items_html" not in media_page:
-                    print_error_msg(account_id + " 在JSON数据：" + str(media_page) + " 中没有找到'items_html'字段")
-                    break
-                if "min_position" not in media_page:
-                    print_error_msg(account_id + " 在JSON数据：" + str(media_page) + " 中没有找到'min_position'字段")
+                if not robot.check_sub_key(("has_more_items", "items_html", "min_position"), media_page):
+                    print_error_msg(account_id + " 图片列表解析错误" + str(media_page))
                     break
 
                 # 正则表达，匹配data-image-url="XXX"
@@ -281,14 +272,12 @@ class Download(threading.Thread):
                         is_over = True
                         break
 
-                if is_over:
-                    break
-
-                if media_page["has_more_items"] and "min_position" in media_page:
-                    # 设置最后一张的data-tweet-id
-                    data_tweet_id = str(media_page["min_position"])
-                else:
-                    break
+                if not is_over:
+                    if media_page["has_more_items"]:
+                        # 设置最后一张的data-tweet-id
+                        data_tweet_id = str(media_page["min_position"])
+                    else:
+                        break
 
             # 如果有错误且没有发现新的图片，复原旧数据
             if self.account_info[2] == "0" and last_image_time != 0:
