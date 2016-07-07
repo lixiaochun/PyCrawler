@@ -1,6 +1,12 @@
 # -*- coding:UTF-8  -*-
-
+"""
+@author: hikaru
+email: hikaru870806@hotmail.com
+如有问题或建议请联系
+"""
 from common import log
+import codecs
+import ConfigParser
 import tool
 import os
 import time
@@ -12,31 +18,39 @@ IS_INIT = False
 class Robot(object):
     def __init__(self):
         global IS_INIT
-        config = analyze_config(os.path.join(os.path.abspath(""), "..\\common\\config.ini"))
+        config = ConfigParser.SafeConfigParser()
+        with codecs.open(os.path.join(os.path.abspath(""), "..\\common\\config.ini"), encoding="utf-8-sig") as file_handle:
+            config.readfp(file_handle)
 
         # 日志
         self.is_show_error = get_config(config, "IS_SHOW_ERROR", 1, 2)
         self.is_show_step = get_config(config, "IS_SHOW_STEP", 1, 2)
         self.is_show_trace = get_config(config, "IS_SHOW_TRACE", 0, 2)
-        self.error_log_path = get_config(config, "ERROR_LOG_PATH", "log/errorLog.txt", 3)
+        error_log_path = get_config(config, "ERROR_LOG_PATH", "log/errorLog.txt", 3)
+        self.error_log_path = error_log_path.replace("{date}", time.strftime("%y-%m-%d", time.localtime(time.time())))
         error_log_dir = os.path.dirname(self.error_log_path)
+
         if not tool.make_dir(error_log_dir, 0):
             tool.print_msg("创建错误日志目录：" + error_log_dir + " 失败，程序结束！", True)
             tool.process_exit()
-        is_log = get_config(config, "IS_LOG", 1, 2)
-        if is_log == 0:
+        is_log_step = get_config(config, "IS_LOG_STEP", 1, 2)
+        if is_log_step == 0:
             self.step_log_path = ""
         else:
-            self.step_log_path = get_config(config, "STEP_LOG_PATH", "log/stepLog.txt", 3)
+            step_log_path = get_config(config, "STEP_LOG_PATH", "log/stepLog.txt", 3)
+            self.step_log_path = step_log_path.replace("{date}", time.strftime("%y-%m-%d", time.localtime(time.time())))
             # 日志文件保存目录
             step_log_dir = os.path.dirname(self.step_log_path)
             if not tool.make_dir(step_log_dir, 0):
                 tool.print_msg("创建步骤日志目录：" + step_log_dir + " 失败，程序结束！", True)
                 tool.process_exit()
-        if True:
+        is_log_trace = get_config(config, "IS_LOG_TRACE", 1, 2)
+        if is_log_trace == 0:
             self.trace_log_path = ""
         else:
-            self.trace_log_path = get_config(config, "TRACE_LOG_PATH", "log/traceLog.txt", 3)
+            trace_log_path = get_config(config, "TRACE_LOG_PATH", "log/traceLog.txt", 3)
+            self.trace_log_path = trace_log_path.replace("{date}", time.strftime("%y-%m-%d", time.localtime(time.time())))
+            # 日志文件保存目录
             trace_log_dir = os.path.dirname(self.trace_log_path)
             if not tool.make_dir(trace_log_dir, 0):
                 tool.print_msg("创建调试日志目录：" + trace_log_dir + " 失败，程序结束！", True)
@@ -63,6 +77,8 @@ class Robot(object):
 
         self.is_sort = get_config(config, "IS_SORT", 1, 2)
         self.get_image_count = get_config(config, "GET_IMAGE_COUNT", 0, 2)
+        self.get_video_count = get_config(config, "GET_VIDEO_COUNT", 0, 2)
+        self.get_page_count = get_config(config, "GET_PAGE_COUNT", 0, 2)
 
         self.save_data_path = get_config(config, "SAVE_DATA_PATH", "info/save.data", 3)
 
@@ -94,51 +110,30 @@ class Robot(object):
 # prefix: 前缀，只有在mode=1时有效
 # postfix: 后缀，只有在mode=1时有效
 def get_config(config, key, default_value, mode, prefix=None, postfix=None):
-    value = None
-    if key in config:
-        if mode == 0:
-            value = config[key]
-        elif mode == 1:
-            value = config[key]
-            if prefix is not None:
-                value = prefix + value
-            if postfix is not None:
-                value = value + postfix
-        elif mode == 2:
-            try:
-                value = int(config[key])
-            except:
-                tool.print_msg("配置文件config.ini中key为'" + key + "'的值必须是一个整数，使用程序默认设置")
-                traceback.print_exc()
-                value = default_value
-        elif mode == 3:
-            value = config[key]
-            if value[0] == "\\":
-                value = os.path.join(os.path.abspath(""), value[1:])  # 第一个 \ 仅做标记使用，实际需要去除
+    if config.has_option("setting", key):
+        value = config.get("setting", key)
     else:
         tool.print_msg("配置文件config.ini中没有找到key为'" + key + "'的参数，使用程序默认设置")
         value = default_value
+    if mode == 0:
+        pass
+    elif mode == 1:
+        if prefix is not None:
+            value = prefix + value
+        if postfix is not None:
+            value = value + postfix
+    elif mode == 2:
+        try:
+            value = int(value)
+        except:
+            tool.print_msg("配置文件config.ini中key为'" + key + "'的值必须是一个整数，使用程序默认设置")
+            traceback.print_exc()
+            value = default_value
+    elif mode == 3:
+        if value[0] == "\\":
+            value = os.path.join(os.path.abspath(""), value[1:])  # 第一个 \ 仅做标记使用，实际需要去除
+        value = os.path.realpath(value)
     return value
-
-
-# 读取配置文件，并生成配置字典
-def analyze_config(config_path):
-    config_file = open(config_path, "r")
-    lines = config_file.readlines()
-    config_file.close()
-    config = {}
-    for line in lines:
-        if len(line) == 0:
-            continue
-        line = line.lstrip().rstrip().replace(" ", "")
-        if len(line) > 1 and line[0] != "#" and line.find("=") >= 0:
-            try:
-                line = line.split("=")
-                config[line[0]] = line[1]
-            except Exception, e:
-                tool.print_msg(str(e))
-                pass
-    return config
 
 
 # 将制定文件夹内的所有文件排序重命名并复制到其他文件夹中
@@ -211,6 +206,7 @@ def get_new_save_file_path(old_save_file_path):
     return os.path.join(os.path.dirname(old_save_file_path), time.strftime("%m-%d_%H_%M_", time.localtime(time.time())) + os.path.basename(old_save_file_path))
 
 
+# 判断类型是否为字典，并且检测是否存在指定的key
 def check_sub_key(needles, haystack):
     if not isinstance(needles, tuple):
         needles = tuple(needles)

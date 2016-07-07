@@ -1,13 +1,10 @@
 # -*- coding:UTF-8  -*-
-'''
-Created on 2014-2-8
-
+"""
+fkoji图片爬虫
 @author: hikaru
-QQ: 286484545
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
-'''
-
+"""
 from common import log, robot, tool
 from common import BeautifulSoup
 import os
@@ -56,22 +53,19 @@ class Fkoji(robot.Robot):
             last_image_url = ""
             image_start_index = 0
 
-        page_index = 1
-        image_count = 1
-        new_last_image_url = ""
-        image_url_list = []
-        is_over = False
-
         if self.is_sort == 1:
             image_path = self.image_temp_path
         else:
             image_path = self.image_download_path
 
         # 下载
-        while True:
+        page_index = 1
+        image_count = 1
+        first_image_url = ""
+        unique_list = []
+        is_over = False
+        while not is_over:
             index_url = "http://jigadori.fkoji.com/?p=%s" % str(page_index)
-            log.trace("网页地址：" + index_url)
-
             [index_page_return_code, index_page_response] = tool.http_request(index_url)[:2]
             if index_page_return_code != 1:
                 log.error("无法访问首页地址" + index_url)
@@ -98,31 +92,36 @@ class Fkoji(robot.Robot):
                     tag_attr = dict(tag.attrs)
                     if tag_attr.has_key("src") and tag_attr.has_key("alt"):
                         image_url = str(tag_attr["src"]).replace(" ", "").encode("GBK")
-                        if new_last_image_url == "":
-                            new_last_image_url = image_url
+
+                        # 新增图片导致的重复判断
+                        if image_url in unique_list:
+                            continue
+                        else:
+                            unique_list.append(image_url)
+                        # 将第一张图片的地址做为新的存档记录
+                        if first_image_url == "":
+                            first_image_url = image_url
                         # 检查是否已下载到前一次的图片
                         if last_image_url == image_url:
                             is_over = True
                             break
-                        log.trace("id: " + account_id + "，地址: " + image_url)
-                        if image_url in image_url_list:
-                            continue
+
                         # 文件类型
                         file_type = image_url.split(".")[-1]
                         if file_type.find("/") != -1:
                             file_type = "jpg"
                         file_path = os.path.join(image_path, str("%05d" % image_count) + "_" + account_id + "." + file_type)
                         log.step("开始下载第" + str(image_count) + "张图片：" + image_url)
-                        if tool.save_image(image_url, file_path):
+                        if tool.save_net_file(image_url, file_path):
                             log.step("第" + str(image_count) + "张图片下载成功")
                             image_count += 1
                         else:
                             log.error("第" + str(image_count) + "张图片 " + image_url + ", id: " + account_id + " 下载失败")
                 if is_over:
                     break
-            if is_over:
-                break
-            page_index += 1
+
+            if not is_over:
+                page_index += 1
 
         log.step("下载完毕")
 
@@ -177,7 +176,7 @@ class Fkoji(robot.Robot):
         # 保存新的存档文件
         temp_list = [account_list[key] for key in sorted(account_list.keys())]
         # 把总数据插入列表头
-        temp_list.insert(0, [ALL_SIGN, str(image_start_index), new_last_image_url])
+        temp_list.insert(0, [ALL_SIGN, str(image_start_index), first_image_url])
         tool.write_file(tool.list_to_string(temp_list), self.save_data_path, 2)
 
         duration_time = int(time.time() - start_time)

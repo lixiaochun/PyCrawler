@@ -1,13 +1,10 @@
 # -*- coding:UTF-8  -*-
-'''
-Created on 2015-6-23
-
+"""
+半次元图片爬虫
 @author: hikaru
-QQ: 286484545
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
-'''
-
+"""
 from common import log, robot, tool
 import cookielib
 import os
@@ -21,6 +18,7 @@ TOTAL_IMAGE_COUNT = 0
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
 IS_DOWNLOAD_IMAGE = 1
+IS_AUTO_FOLLOW = True
 
 threadLock = threading.Lock()
 
@@ -48,10 +46,31 @@ def login(email, password):
     login_url = "http://bcy.net/public/dologin"
     login_post = {"email": email, "password": password}
     login_return_code = tool.http_request(login_url, login_post, cookie)[0]
-    if login_return_code == 0:
+    if login_return_code == 1:
         return True
     else:
         return False
+
+
+def follow(account_id):
+    follow_url = "http://bcy.net/weibo/Operate/follow?"
+    follow_post_data = {"uid": account_id, "type": "dofollow"}
+    follow_return_code, follow_return_data = tool.http_request(follow_url, follow_post_data)[:2]
+    if follow_return_code == 1:
+        # 0 未登录，11 关注成功，12 已关注
+        if int(follow_return_data) == 12:
+            return True
+    return False
+
+
+def unfollow(account_id):
+    unfollow_url = "http://bcy.net/weibo/Operate/follow?"
+    unfollow_post_data = {"uid": account_id, "type": "unfollow"}
+    unfollow_return_code, unfollow_return_data = tool.http_request(unfollow_url, unfollow_post_data)[:2]
+    if unfollow_return_code == 1:
+        if int(unfollow_return_data) == 1:
+            return True
+    return False
 
 
 class Bcy(robot.Robot):
@@ -176,21 +195,15 @@ class Download(threading.Thread):
         try:
             print_step_msg(cn + " 开始")
 
-            last_rp_id = self.account_info[1]
-            self.account_info[1] = ""  # 置空，存放此次的最后rp id
+            # 图片下载
             this_cn_total_image_count = 0
             page_count = 1
             max_page_count = -1
+            first_rp_id = ""
+            unique_list = []
             need_make_download_dir = True  # 是否需要创建cn目录
-            rp_id_list = []
             is_over = False
-            # 如果有存档记录，则直到找到与前一次一致的地址，否则都算有异常
-            if last_rp_id != "0":
-                is_error = True
-            else:
-                is_error = False
-
-            while True:
+            while not is_over:
                 post_url = "http://bcy.net/u/%s/post/cos?&p=%s" % (coser_id, page_count)
                 [post_page_return_code, post_page_response] = tool.http_request(post_url)[:2]
                 if post_page_return_code != 1:
@@ -206,17 +219,18 @@ class Download(threading.Thread):
                     break
 
                 title_index = 0
-                for data in page_rp_id_list:
-                    cp_id = data[0]
-                    rp_id = data[1]
-                    rp_id_list.append(rp_id)
+                for cp_id, rp_id in page_rp_id_list:
+                    if rp_id in unique_list:
+                        continue
+                    else:
+                        unique_list.append(rp_id)
 
-                    if self.account_info[1] == "":
-                        self.account_info[1] = rp_id
+                    # 将第一个作品的id做为新的存档记录
+                    if first_rp_id == "":
+                        first_rp_id = rp_id
                     # 检查是否已下载到前一次的图片
-                    if int(rp_id) <= int(last_rp_id):
+                    if int(rp_id) <= int(self.account_info[1]):
                         is_over = True
-                        is_error = False
                         break
 
                     print_step_msg("rp: " + rp_id)
@@ -230,84 +244,85 @@ class Download(threading.Thread):
                             tool.process_exit()
                         need_make_download_dir = False
 
-                    # 正片目录
+                    # 作品目录
                     title = page_title_list[title_index]
                     # 过滤一些windows文件名屏蔽的字符
                     for filter_char in ["\\", "/", ":", "*", "?", '"', "<", ">", "|"]:
                         title = title.replace(filter_char, " ")
                     # 去除前后空格
                     title = title.strip()
-                    if title != "":
+                    if title:
                         rp_path = os.path.join(image_path, rp_id + " " + title)
                     else:
                         rp_path = os.path.join(image_path, rp_id)
                     if not tool.make_dir(rp_path, 0):
                         # 目录出错，把title去掉后再试一次，如果还不行退出
-                        print_error_msg(cn + " 创建正片目录： " + rp_path + " 失败，尝试不使用title！")
+                        print_error_msg(cn + " 创建作品目录： " + rp_path + " 失败，尝试不使用title！")
                         rp_path = os.path.join(image_path, rp_id)
                         if not tool.make_dir(rp_path, 0):
-                            print_error_msg(cn + " 创建正片目录： " + rp_path + " 失败，程序结束！")
+                            print_error_msg(cn + " 创建作品目录： " + rp_path + " 失败，程序结束！")
                             tool.process_exit()
 
                     rp_url = "http://bcy.net/coser/detail/%s/%s" % (cp_id, rp_id)
                     [rp_page_return_code, rp_page_response] = tool.http_request(rp_url)[:2]
-                    if rp_page_return_code == 1:
-                        image_count = 0
-                        image_index = rp_page_response.find("src='")
-                        while image_index != -1:
+                    if rp_page_return_code != 1:
+                        print_error_msg(cn + " 无法获取作品页面： " + rp_url)
+                        continue
+
+                    image_url_list = re.findall("src='([^']*)'", rp_page_response)
+                    if len(image_url_list) == 0 and IS_AUTO_FOLLOW:
+                        print_step_msg(cn + " 检测到可能有私密作品且账号不是ta的粉丝，自动关注")
+                        if follow(coser_id):
+                            # 重新获取下详细页面
+                            rp_url = "http://bcy.net/coser/detail/%s/%s" % (cp_id, rp_id)
+                            [rp_page_return_code, rp_page_response] = tool.http_request(rp_url)[:2]
+                            if rp_page_return_code == 1:
+                                image_url_list = re.findall("src='([^']*)'", rp_page_response)
+
+                    if len(image_url_list) == 0:
+                        print_error_msg(cn + " " + rp_id + " 没有任何图片，可能是你使用的账号没有关注ta，所以无法访问只对粉丝开放的私密作品")
+                        continue
+
+                    image_count = 1
+                    for image_url in image_url_list:
+                        # 禁用指定分辨率
+                        image_url = "/".join(image_url.split("/")[0:-1])
+
+                        if image_url.rfind("/") < image_url.rfind("."):
+                            file_type = image_url.split(".")[-1]
+                        else:
+                            file_type = "jpg"
+                        file_path = os.path.join(rp_path, str("%03d" % image_count) + "." + file_type)
+
+                        print_step_msg(cn + ":" + rp_id + " 开始下载第" + str(image_count) + "张图片：" + image_url)
+                        if tool.save_net_file(image_url, file_path):
                             image_count += 1
+                            print_step_msg(cn + " " + rp_id + " 第" + str(image_count) + "张图片下载成功")
+                        else:
+                            print_error_msg(cn + " " + rp_id + " 第" + str(image_count) + "张图片 " + image_url + " 下载失败")
 
-                            image_start = rp_page_response.find("http", image_index)
-                            image_stop = rp_page_response.find("'", image_start)
-                            image_url = rp_page_response[image_start:image_stop]
-                            # 禁用指定分辨率
-                            image_url = "/".join(image_url.split("/")[0:-1])
-
-                            if image_url.rfind("/") < image_url.rfind("."):
-                                file_type = image_url.split(".")[-1]
-                            else:
-                                file_type = "jpg"
-                            file_path = os.path.join(rp_path, str("%03d" % image_count) + "." + file_type)
-
-                            print_step_msg(cn + ":" + rp_id + " 开始下载第" + str(image_count) + "张图片：" + image_url)
-                            if tool.save_image(image_url, file_path):
-                                print_step_msg(cn + " " + rp_id + " 第" + str(image_count) + "张图片下载成功")
-                            else:
-                                print_error_msg(cn + " " + rp_id + " 第" + str(image_count) + "张图片 " + image_url + " 下载失败")
-
-                            image_index = rp_page_response.find("src='", image_index + 1)
-
-                        if image_count == 0:
-                            print_error_msg(cn + " " + rp_id + " 没有任何图片，可能是你使用的账号没有关注ta，所以无法访问只对粉丝开放的私密作品")
-
-                        this_cn_total_image_count += image_count - 1
+                    this_cn_total_image_count += image_count - 1
 
                     title_index += 1
 
-                if is_over:
-                    break
-
-                # 看看总共有几页
-                if max_page_count == -1:
-                    max_page_count_result = re.findall(r'<a href="/u/' + coser_id + '/post/cos\?&p=(\d*)">尾页</a>', post_page_response)
-                    if len(max_page_count_result) > 0:
-                        max_page_count = int(max_page_count_result[0])
+                if not is_over:
+                    # 看看总共有几页
+                    if max_page_count == -1:
+                        max_page_count_find = re.findall(r'<a href="/u/' + coser_id + '/post/cos\?&p=(\d*)">尾页</a>', post_page_response)
+                        if len(max_page_count_find) > 0:
+                            max_page_count = int(max_page_count_find[0])
+                        else:
+                            max_page_count = 1
+                    if page_count >= max_page_count:
+                        is_over = True
                     else:
-                        max_page_count = 1
-
-                if page_count >= max_page_count:
-                    break
-
-                page_count += 1
-
-            # 如果有错误且没有发现新的图片，复原旧数据
-            if self.account_info[1] == "" and last_rp_id != "0":
-                self.account_info[1] = str(last_rp_id)
+                        page_count += 1
 
             print_step_msg(cn + " 下载完毕，总共获得" + str(this_cn_total_image_count) + "张图片")
 
-            if is_error:
-                print_error_msg(cn + " 图片数量异常，请手动检查")
+            # 新的存档记录
+            if first_rp_id != "":
+                self.account_info[1] = first_rp_id
 
             # 保存最后的信息
             threadLock.acquire()

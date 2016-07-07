@@ -1,13 +1,10 @@
 # -*- coding:UTF-8  -*-
-'''
-Created on 2014-5-31
-
+"""
+Twitter图片爬虫
 @author: hikaru
-QQ: 286484545
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
-'''
-
+"""
 from common import log, robot, tool
 import json
 import os
@@ -50,6 +47,22 @@ def trace(msg):
     threadLock.release()
 
 
+# 获取一页的图片信息
+def get_twitter_media_page_data(account_id, data_tweet_id):
+    media_page_url = "https://twitter.com/i/profiles/show/%s/media_timeline?include_available_features=1" \
+                     "&include_entities=1&max_position=%s" % (account_id, data_tweet_id)
+    [media_page_return_code, media_page_response] = tool.http_request(media_page_url)[:2]
+    if media_page_return_code == 1:
+        try:
+            media_page = json.loads(media_page_response)
+        except AttributeError:
+            pass
+        else:
+            if robot.check_sub_key(("has_more_items", "items_html", "min_position"), media_page):
+                return media_page
+    return None
+
+
 # 返回的是当前时区对应的时间
 def get_image_last_modified(response):
     if isinstance(response, urllib2.addinfourl):
@@ -60,6 +73,7 @@ def get_image_last_modified(response):
     return 0
 
 
+# 将图片的二进制数据保存为本地文件
 def save_image(image_byte, image_path):
     image_path = tool.change_path_encoding(image_path)
     image_file = open(image_path, "wb")
@@ -76,7 +90,6 @@ class Twitter(robot.Robot):
         global IS_SORT
         global IS_DOWNLOAD_IMAGE
 
-        # multiprocessing.Process.__init__(self)
         robot.Robot.__init__(self)
 
         if save_data_path != "":
@@ -193,15 +206,6 @@ class Download(threading.Thread):
         try:
             print_step_msg(account_id + " 开始")
 
-            # 初始化数据
-            last_image_time = int(self.account_info[2])
-            self.account_info[2] = "0"  # 置空，存放此次的最后图片上传时间
-            data_tweet_id = INIT_MAX_ID
-            image_count = 1
-            image_url_list = []
-            is_over = False
-            need_make_download_dir = True
-
             # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
             if IS_SORT == 1:
                 image_path = os.path.join(IMAGE_TEMP_PATH, account_id)
@@ -209,61 +213,42 @@ class Download(threading.Thread):
                 image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_id)
 
             # 图片下载
-            while True:
-                media_page_url = "https://twitter.com/i/profiles/show/%s/media_timeline?include_available_features=1" \
-                                 "&include_entities=1&max_position=%s" % (account_id, data_tweet_id)
-
-                [media_page_return_code, media_page_response] = tool.http_request(media_page_url)[:2]
-                if media_page_return_code != 1:
-                    print_error_msg(account_id + " 无法获取相册信息: " + media_page_url)
-                    break
-                try:
-                    media_page = json.loads(media_page_response)
-                except:
-                    print_error_msg(account_id + " 返回信息：" + str(media_page_response) + " 不是一个JSON数据")
+            image_count = 1
+            data_tweet_id = INIT_MAX_ID
+            first_image_time = "0"
+            is_over = False
+            need_make_download_dir = True
+            while not is_over:
+                # 获取指定时间点后的一页图片信息
+                media_page = get_twitter_media_page_data(account_id, data_tweet_id)
+                if not media_page:
+                    print_error_msg(account_id + " 图片列表解析错误")
                     break
 
-                if not isinstance(media_page, dict):
-                    print_error_msg(account_id + " JSON数据：" + str(media_page) + " 不是一个字典")
-                    break
-                if "has_more_items" not in media_page:
-                    print_error_msg(account_id + " 在JSON数据：" + str(media_page) + " 中没有找到'has_more_items'字段")
-                    break
-                if "items_html" not in media_page:
-                    print_error_msg(account_id + " 在JSON数据：" + str(media_page) + " 中没有找到'items_html'字段")
-                    break
-                if "min_position" not in media_page:
-                    print_error_msg(account_id + " 在JSON数据：" + str(media_page) + " 中没有找到'min_position'字段")
-                    break
-
-                # 正则表达，匹配data-image-url="XXX"
+                # 匹配获取全部的图片地址
                 this_page_image_url_list = re.findall('data-image-url="([^"]*)"', media_page["items_html"])
                 trace(account_id + " data_tweet_id：" + data_tweet_id + " 的全部图片列表" + str(this_page_image_url_list))
                 for image_url in this_page_image_url_list:
                     image_url = str(image_url)
-                    image_url_list.append(image_url)
+                    print_step_msg(account_id + " 开始下载第 " + str(image_count) + "张图片：" + image_url)
 
+                    # todo 是否可以优化到一个方法中
                     [image_return_code, image_response_data, image_response] = tool.http_request(image_url)
                     # 404，不算做错误，图片已经被删掉了
                     if image_return_code == -404:
-                        pass
+                        print_error_msg(account_id + " 第" + str(image_count) + "张图片 " + image_url + "已被删除，跳过")
                     elif image_return_code == 1:
                         image_time = get_image_last_modified(image_response)
-                        # 将第一张image的URL保存到新id list中
-                        if self.account_info[2] == "0":
-                            self.account_info[2] = str(image_time)
-
-                        # 检查是否已下载到前一次的图片
-                        if 0 < last_image_time >= image_time:
+                        # 将第一张图片的上传时间做为新的存档记录
+                        if first_image_time == "0":
+                            first_image_time = str(image_time)
+                        # 检查是否图片时间小于上次的记录
+                        if image_time <= int(self.account_info[2]):
                             is_over = True
                             break
 
-                        # 文件类型
                         file_type = image_url.split(".")[-1].split(":")[0]
                         file_path = os.path.join(image_path, str("%04d" % image_count) + "." + file_type)
-
-                        # 保存图片
-                        print_step_msg(account_id + " 开始下载第 " + str(image_count) + "张图片：" + image_url)
                         # 第一张图片，创建目录
                         if need_make_download_dir:
                             if not tool.make_dir(image_path, 0):
@@ -281,18 +266,12 @@ class Download(threading.Thread):
                         is_over = True
                         break
 
-                if is_over:
-                    break
-
-                if media_page["has_more_items"] and "min_position" in media_page:
-                    # 设置最后一张的data-tweet-id
-                    data_tweet_id = str(media_page["min_position"])
-                else:
-                    break
-
-            # 如果有错误且没有发现新的图片，复原旧数据
-            if self.account_info[2] == "0" and last_image_time != 0:
-                self.account_info[2] = str(last_image_time)
+                if not is_over:
+                    # 查找下一页的data_tweet_id
+                    if media_page["has_more_items"]:
+                        data_tweet_id = str(media_page["min_position"])
+                    else:
+                        break
 
             print_step_msg(account_id + " 下载完毕，总共获得" + str(image_count - 1) + "张图片")
 
@@ -305,7 +284,10 @@ class Download(threading.Thread):
                     print_error_msg(account_id + " 创建图片子目录： " + destination_path + " 失败，程序结束！")
                     tool.process_exit()
 
-            self.account_info[1] = str(int(self.account_info[1]) + image_count - 1)
+            # 新的存档记录
+            if first_image_time != "0":
+                self.account_info[1] = str(int(self.account_info[1]) + image_count - 1)
+                self.account_info[2] = first_image_time
 
             # 保存最后的信息
             threadLock.acquire()

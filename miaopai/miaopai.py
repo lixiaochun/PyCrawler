@@ -1,13 +1,10 @@
 # -*- coding:UTF-8  -*-
-'''
-Created on 2016-6-16
-
+"""
+秒拍视频爬虫
 @author: hikaru
-QQ: 286484545
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
-'''
-
+"""
 from common import log, robot, tool
 import json
 import os
@@ -46,11 +43,30 @@ def print_step_msg(msg):
     threadLock.release()
 
 
-def save_image(image_byte, image_path):
-    image_path = tool.change_path_encoding(image_path)
-    image_file = open(image_path, "wb")
-    image_file.write(image_byte)
-    image_file.close()
+# 获取用户的suid，作为查找指定用户的视频页的凭着
+def get_miaopai_suid(account_id):
+    index_page_url = "http://www.miaopai.com/u/paike_%s" % account_id
+    [index_page_return_code, index_page] = tool.http_request(index_page_url)[:2]
+    if index_page_return_code == 1:
+        suid_find = re.findall('<button class="guanzhu gz" suid="([^"]*)" heade="1" token="">\+关注</button>', index_page)
+        if len(suid_find) == 1:
+            return suid_find[0]
+    return None
+
+
+# 获取一页的视频信息
+def get_miaopai_video_page_data(suid, page_count):
+    media_page_url = "http://www.miaopai.com/gu/u?page=%s&suid=%s&fen_type=channel" % (page_count, suid)
+    [media_page_return_code, media_page] = tool.http_request(media_page_url)[:2]
+    if media_page_return_code == 1:
+        try:
+            media_page = json.loads(media_page)
+        except AttributeError:
+            pass
+        else:
+            if robot.check_sub_key(("isall", "msg"), media_page):
+                return media_page
+    return None
 
 
 class Miaopai(robot.Robot):
@@ -170,100 +186,86 @@ class Download(threading.Thread):
         try:
             print_step_msg(account_id + " 开始")
 
-            # 初始化数据
-            last_video_url = self.account_info[2]
-            self.account_info[2] = ""  # 置空，存放此次的最后视频地址
-            page_count = 1
-            video_count = 1
-            need_make_download_dir = True
-
             # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
             if IS_SORT == 1:
                 video_path = os.path.join(VIDEO_TEMP_PATH, account_id)
             else:
                 video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_id)
 
-            suid = ""
-            index_page_url = "http://www.miaopai.com/u/paike_%s" % account_id
-            [index_page_return_code, index_page] = tool.http_request(index_page_url)[:2]
-            if index_page_return_code == 1:
-                suid_find = re.findall('<button class="guanzhu gz" suid="([^"]*)" heade="1" token="">\+关注</button>', index_page)
-                if len(suid_find) == 1:
-                    suid = suid_find[0]
-                    trace(account_id + " suid: " + suid)
-                else:
-                    print_error_msg(account_id + " suid获取失败")
-            else:
-                print_error_msg(account_id + " 无法访问首页" + index_page_url)
+            suid = get_miaopai_suid(account_id)
+            if not suid:
+                print_error_msg(account_id + " suid获取失败")
 
-            while suid != "" and IS_DOWNLOAD_VIDEO == 1:
-                media_page_url = "http://www.miaopai.com/gu/u?page=%s&suid=%s&fen_type=channel" % (page_count, suid)
-
-                [media_page_return_code, media_page] = tool.http_request(media_page_url)[:2]
-                if media_page_return_code != 1:
-                    print_error_msg(account_id + " 第" + str(page_count) + "页视频列表获取失败")
-                    break
-
-                try:
-                    media_page = json.loads(media_page)
-                except:
-                    print_error_msg(account_id + " 返回的视频列表不是一个JSON数据")
-                    break
-                if "isall" not in media_page:
-                    print_error_msg(account_id + " 在视频列表：" + str(media_page) + " 中没有找到'isall'字段")
-                    break
-                if "msg" not in media_page:
-                    print_error_msg(account_id + " 在视频列表：" + str(media_page) + " 中没有找到'msg'字段")
+            page_count = 1
+            video_count = 1
+            first_video_scid = ""
+            unique_list = []
+            is_over = False
+            need_make_download_dir = True
+            while suid != "" and (not is_over):
+                # 获取指定一页的视频信息
+                media_page = get_miaopai_video_page_data(suid, page_count)
+                if not media_page:
+                    print_error_msg(account_id + " 视频列表解析错误")
                     break
 
                 msg_data = media_page["msg"]
                 scid_list = re.findall('data-scid="([^"]*)"', msg_data)
-                if len(scid_list) > 0:
-                    for scid in scid_list:
-                        video_url = "http://wsqncdn.miaopai.com/stream/%s.mp4" % str(scid)
-
-                        # 文件类型
-                        file_path = os.path.join(video_path, str("%04d" % video_count) + ".mp4")
-
-                        # 保存视频
-                        print_step_msg(account_id + " 开始下载第 " + str(video_count) + "个视频：" + video_url)
-                        # 第一个视频，创建目录
-                        if need_make_download_dir:
-                            if not tool.make_dir(video_path, 0):
-                                print_error_msg(account_id + " 创建视频下载目录： " + video_path + " 失败，程序结束！")
-                                tool.process_exit()
-                            need_make_download_dir = False
-                        if tool.save_image(video_url, file_path):
-                            print_step_msg(account_id + " 第" + str(video_count) + "个视频下载成功")
-                            video_count += 1
-                        else:
-                            print_error_msg(account_id + " 第" + str(video_count) + "个视频 " + video_url + " 下载失败")
-                else:
+                if len(scid_list) == 0:
                     print_error_msg(account_id + " 在视频列表：" + str(media_page) + " 中没有找到视频scid")
                     break
 
-                if media_page["isall"]:
-                    break
+                for scid in scid_list:
+                    # 新增视频导致的重复判断
+                    if scid in unique_list:
+                        continue
+                    else:
+                        unique_list.append(scid)
+                    # 将第一个视频的id做为新的存档记录
+                    if first_video_scid == "":
+                        first_video_scid = scid
+                    # 检查是否已下载到前一次的图片
+                    if first_video_scid == self.account_info[2]:
+                        is_over = True
+                        break
 
-                page_count += 1
+                    video_url = "http://wsqncdn.miaopai.com/stream/%s.mp4" % str(scid)
+                    print_step_msg(account_id + " 开始下载第 " + str(video_count) + "个视频：" + video_url)
 
-            # 如果有错误且没有发现新的视频，复原旧数据
-            if self.account_info[2] == "" and last_video_url != "":
-                self.account_info[2] = last_video_url
+                    file_path = os.path.join(video_path, str("%04d" % video_count) + ".mp4")
+                    # 第一个视频，创建目录
+                    if need_make_download_dir:
+                        if not tool.make_dir(video_path, 0):
+                            print_error_msg(account_id + " 创建视频下载目录： " + video_path + " 失败，程序结束！")
+                            tool.process_exit()
+                        need_make_download_dir = False
+                    if tool.save_net_file(video_url, file_path):
+                        print_step_msg(account_id + " 第" + str(video_count) + "个视频下载成功")
+                        video_count += 1
+                    else:
+                        print_error_msg(account_id + " 第" + str(video_count) + "个视频 " + video_url + " 下载失败")
+
+                if not is_over:
+                    if media_page["isall"]:
+                        is_over = True
+                    else:
+                        page_count += 1
 
             print_step_msg(account_id + " 下载完毕，总共获得" + str(video_count - 1) + "个视频")
 
             # 排序
-            if IS_SORT == 1:
-                if video_count > 1:
-                    destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_id)
-                    if robot.sort_file(video_path, destination_path, int(self.account_info[4]), 4):
-                        print_step_msg(account_id + " 视频从下载目录移动到保存目录成功")
-                    else:
-                        print_error_msg(account_id + " 创建视频保存目录： " + destination_path + " 失败，程序结束！")
-                        tool.process_exit()
+            if IS_SORT == 1 and video_count > 1:
+                destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_id)
+                if robot.sort_file(video_path, destination_path, int(self.account_info[4]), 4):
+                    print_step_msg(account_id + " 视频从下载目录移动到保存目录成功")
+                else:
+                    print_error_msg(account_id + " 创建视频保存目录： " + destination_path + " 失败，程序结束！")
+                    tool.process_exit()
 
-            self.account_info[1] = str(int(self.account_info[1]) + video_count - 1)
+            # 新的存档记录
+            if first_video_scid != "":
+                self.account_info[1] = str(int(self.account_info[1]) + video_count - 1)
+                self.account_info[2] = first_video_scid
 
             # 保存最后的信息
             threadLock.acquire()
