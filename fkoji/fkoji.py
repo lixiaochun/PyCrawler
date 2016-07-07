@@ -1,13 +1,10 @@
 # -*- coding:UTF-8  -*-
-'''
-Created on 2014-2-8
-
+"""
+fkoji图片爬虫
 @author: hikaru
-QQ: 286484545
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
-'''
-
+"""
 from common import log, robot, tool
 from common import BeautifulSoup
 import os
@@ -113,7 +110,7 @@ class Fkoji(robot.Robot):
                             file_type = "jpg"
                         file_path = os.path.join(image_path, str("%05d" % image_count) + "_" + account_id + "." + file_type)
                         log.step("开始下载第" + str(image_count) + "张图片：" + image_url)
-                        if tool.save_image(image_url, file_path):
+                        if tool.save_net_file(image_url, file_path):
                             log.step("第" + str(image_count) + "张图片下载成功")
                             image_count += 1
                         else:

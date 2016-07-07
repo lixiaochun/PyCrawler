@@ -1,13 +1,10 @@
 # -*- coding:UTF-8  -*-
-'''
-Created on 2013-8-28
-
+"""
+微博图片&视频爬虫
 @author: hikaru
-QQ: 286484545
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
-'''
-
+"""
 from common import log, robot, tool
 import hashlib
 import json
@@ -93,17 +90,34 @@ def visit_weibo(url):
     return False
 
 
+# 获取一页的图片信息
+def get_weibo_photo_page_data(account_id, page_count):
+    photo_page_url = "http://photo.weibo.com/photos/get_all"
+    photo_page_url += "?uid=%s&count=%s&page=%s&type=3" % (account_id, IMAGE_COUNT_PER_PAGE, page_count)
+    photo_page_data = visit_weibo(photo_page_url)
+    try:
+        page = json.loads(photo_page_data)
+    except AttributeError:
+        pass
+    else:
+        if robot.check_sub_key(("data", ), page):
+            if robot.check_sub_key(("total", "photo_list"), page["data"]):
+                return page["data"]
+    return None
+
+
 # 获取账号对应的page_id
 def get_weibo_account_page_id(account_id):
-    index_url = "http://weibo.com/u/%s?is_all=1" % account_id
-    index_page = visit_weibo(index_url)
-    page_id = re.findall("\$CONFIG\['page_id'\]='(\d*)'", index_page)
-    if len(page_id) == 1:
-        return page_id[0]
+    for i in range(0, 5):
+        index_url = "http://weibo.com/u/%s?is_all=1" % account_id
+        index_page = visit_weibo(index_url)
+        page_id = re.findall("\$CONFIG\['page_id'\]='(\d*)'", index_page)
+        if len(page_id) == 1:
+            return page_id[0]
     return 0
 
 
-# 获取一定数量的视频播放页面
+# 获取一页的视频信息
 def get_weibo_video_page_data(page_id, since_id):
     video_album_url = "http://weibo.com/p/aj/album/loading?type=video&since_id=%s&page_id=%s&page=1&ajax_call=1" % (since_id, page_id)
     for i in range(0, 10):
@@ -112,21 +126,20 @@ def get_weibo_video_page_data(page_id, since_id):
             try:
                 video_page = json.loads(video_page)
             except AttributeError:
-                continue
-            if not robot.check_sub_key(("code", "data"), video_page):
-                continue
-            if int(video_page["code"]) != 100000:
-                continue
-            return video_page[u"data"].encode("utf-8")
+                pass
+            else:
+                if robot.check_sub_key(("code", "data"), video_page):
+                    if int(video_page["code"]) == 100000:
+                        return video_page[u"data"].encode("utf-8")
     return None
 
 
 # 从视频播放页面中提取源地址
-def find_real_video_url(video_page_url, account_name, video_count):
+def find_real_video_url(video_page_url, account_name):
     # http://miaopai.com/show/Gmd7rwiNrc84z5h6S9DhjQ__.htm
     if video_page_url.find("miaopai.com/show/") >= 0:  # 秒拍
         video_id = video_page_url.split("/")[-1].split(".")[0]
-        return ["http://wsqncdn.miaopai.com/stream/%s.mp4" % video_id]
+        return [1, ["http://wsqncdn.miaopai.com/stream/%s.mp4" % video_id]]
     # http://video.weibo.com/show?fid=1034:e608e50d5fa95410748da61a7dfa2bff
     elif video_page_url.find("video.weibo.com/show?fid=") >= 0:  # 微博视频
         # 多次尝试，在多线程访问的时候有较大几率无法返回正确的信息
@@ -143,8 +156,8 @@ def find_real_video_url(video_page_url, account_name, video_count):
                             video_source_url = []
                             for ssig in ssig_list:
                                 video_source_url.append("http://us.sinaimg.cn/" + ssig)
-                            return video_source_url
-        print_error_msg(account_name + " 第" + video_count + "个视频：" + video_page_url + "没有获取到源地址")
+                            return [1, video_source_url]
+        return [-1, []]
     # http://www.meipai.com/media/98089758
     elif video_page_url.find("www.meipai.com/media") >= 0:  # 美拍
         [source_video_page_return_code, source_video_page] = tool.http_request(video_page_url)[:2]
@@ -152,14 +165,14 @@ def find_real_video_url(video_page_url, account_name, video_count):
             meta_list = re.findall('<meta content="([^"]*)" property="([^"]*)">', source_video_page)
             for meta_content, meta_property in meta_list:
                 if meta_property == "og:video:url":
-                    return [meta_content]
-            print_error_msg(account_name + " 第" + video_count + "个视频：" + video_page_url + "没有获取到源地址")
+                    return [1, [meta_content]]
+            return [-1, []]
         else:
-            print_error_msg(account_name + " 第" + video_count + "个视频：" + video_page_url + "无法访问")
+            return [-2, []]
     # http://v.xiaokaxiu.com/v/0YyG7I4092d~GayCAhwdJQ__.html
     elif video_page_url.find("v.xiaokaxiu.com/v/") >= 0:  # 小咖秀
         video_id = video_page_url.split("/")[-1].split(".")[0]
-        return ["http://bsyqncdn.miaopai.com/stream/%s.mp4" % video_id]
+        return [1, ["http://bsyqncdn.miaopai.com/stream/%s.mp4" % video_id]]
     # http://www.weishi.com/t/2000546051794045
     elif video_page_url.find("www.weishi.com/t/") >= 0:  # 微视
         [source_video_page_return_code, source_video_page] = tool.http_request(video_page_url)[:2]
@@ -172,18 +185,17 @@ def find_real_video_url(video_page_url, account_name, video_count):
                 if video_info_page_return_code == 1:
                     try:
                         video_info_page = json.loads(video_info_page)
-                        if robot.check_sub_key(("data", ), video_info_page):
-                            if robot.check_sub_key(("url", ), video_info_page["data"]):
-                                return [random.choice(video_info_page["data"]["url"])]
                     except AttributeError:
                         pass
-            print_error_msg(account_name + " 第" + video_count + "个视频：" + video_page_url + "没有获取到源地址")
+                    else:
+                        if robot.check_sub_key(("data", ), video_info_page):
+                            if robot.check_sub_key(("url", ), video_info_page["data"]):
+                                return [1, [random.choice(video_info_page["data"]["url"])]]
+            return [-1, []]
         else:
-            print_error_msg(account_name + " 第" + video_count + "个视频：" + video_page_url + "无法访问")
+            return [-2, []]
     else:  # 其他视频，暂时不支持，收集看看有没有
-        print_error_msg(account_name + " 第" + video_count + "个视频：" + video_page_url + "，暂不支持的视频源")
-
-    return []
+        return [-3, []]
 
 
 # 访问图片源地址，判断是不是图片已经被删除或暂时无法访问后，返回图片字节
@@ -252,14 +264,14 @@ class Weibo(robot.Robot):
 
         start_time = time.time()
 
-        # 图片保存目录
+        # 创建图片保存目录
         if IS_DOWNLOAD_IMAGE == 1:
             print_step_msg("创建图片根目录：" + IMAGE_DOWNLOAD_PATH)
             if not tool.make_dir(IMAGE_DOWNLOAD_PATH, 0):
                 print_error_msg("创建图片根目录：" + IMAGE_DOWNLOAD_PATH + " 失败，程序结束！")
                 tool.process_exit()
 
-        # 视频保存目录
+        # 创建视频保存目录
         if IS_DOWNLOAD_VIDEO == 1:
             print_step_msg("创建视频根目录：" + VIDEO_DOWNLOAD_PATH)
             if not tool.make_dir(VIDEO_DOWNLOAD_PATH, 0):
@@ -289,8 +301,8 @@ class Weibo(robot.Robot):
         new_save_data_file = open(NEW_SAVE_DATA_PATH, "w")
         new_save_data_file.close()
 
-        # 先访问下页面，产生个cookies
-        visit_weibo("http://photo.weibo.com/photos/get_all?uid=1263970750&count=30&page=1&type=3")
+        # 先访问下页面，产生cookies
+        visit_weibo("http://www.weibo.com/")
         time.sleep(2)
 
         # 启用线程监控是否需要暂停其他下载线程
@@ -361,12 +373,6 @@ class Download(threading.Thread):
         try:
             print_step_msg(account_name + " 开始")
 
-            # 初始化数据
-            last_image_time = int(self.account_info[2])
-            self.account_info[2] = "0"  # 置空，存放此次的最后图片上传时间
-            last_video_url = self.account_info[4]
-            self.account_info[4] = ""  # 置空，存放此次的的最后一个视频地址
-
             # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
             if IS_SORT == 1:
                 image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
@@ -378,33 +384,49 @@ class Download(threading.Thread):
             # 视频
             video_count = 1
             page_id = 0
+            first_video_url = ""
             is_over = False
             need_make_video_dir = True
             since_id = INIT_SINCE_ID
             while (IS_DOWNLOAD_VIDEO == 1) and (not is_over):
+                # 获取page_id
                 if not page_id:
                     page_id = get_weibo_account_page_id(account_id)
                     if not page_id:
                         print_error_msg(account_name + " 微博主页没有获取到page_id")
                         break
 
+                # 获取指定时间点后的一页视频信息
                 video_page_data = get_weibo_video_page_data(page_id, since_id)
                 if not video_page_data:
                     print_error_msg(account_name + " 视频列表解析异常")
                     break
-                
+
+                # 匹配获取全部的视频页面
                 video_page_url_list = re.findall('<a target="_blank" href="([^"]*)"><div ', video_page_data)
                 trace(account_name + "since_id：" + since_id + "中的全部视频：" + str(video_page_url_list))
                 for video_page_url in video_page_url_list:
-                    if self.account_info[4] == "":
-                        self.account_info[4] = video_page_url
+                    # 将第一个视频的地址做为新的存档记录
+                    if first_video_url == "":
+                        first_video_url = video_page_url
                     # 检查是否是上一次的最后视频
-                    if last_video_url == video_page_url:
+                    if self.account_info[4] == video_page_url:
                         is_over = True
                         break
-                    video_source_url_list = find_real_video_url(video_page_url, account_name, str(video_count))
+                    # 获取这个视频的视频源地址（下载地址）
+                    [return_code, video_source_url_list] = find_real_video_url(video_page_url, account_name)
+                    if return_code != 1:
+                        if return_code == -1:
+                            print_error_msg(account_name + " 第" + str(video_count) + "个视频：" + video_page_url + "没有获取到源地址")
+                        elif return_code == -2:
+                            print_error_msg(account_name + " 第" + str(video_count) + "个视频：" + video_page_url + "无法访问")
+                        elif return_code == -3:
+                            print_error_msg(account_name + " 第" + str(video_count) + "个视频：" + video_page_url + "，暂不支持的视频源")
+                        continue
                     # 下载
                     for video_source_url in video_source_url_list:
+                        print_step_msg(account_name + " 开始下载第" + str(video_count) + "个视频：" + video_page_url)
+
                         video_file_path = os.path.join(video_path, str("%04d" % video_count) + ".mp4")
                         # 第一个视频，创建目录
                         if need_make_video_dir:
@@ -412,9 +434,7 @@ class Download(threading.Thread):
                                 print_error_msg(account_name + " 创建图片下载目录： " + video_path + " 失败，程序结束！")
                                 tool.process_exit()
                             need_make_video_dir = False
-
-                        print_step_msg(account_name + " 开始下载第" + str(video_count) + "个视频：" + video_page_url)
-                        if tool.save_image(video_source_url, video_file_path):
+                        if tool.save_net_file(video_source_url, video_file_path):
                             print_step_msg(account_name + " 第" + str(video_count) + "个视频下载成功")
                             video_count += 1
                         else:
@@ -426,59 +446,48 @@ class Download(threading.Thread):
                         break
 
                 if not is_over:
+                    # 获取下一页的since_id
                     since_id_data = re.findall('action-data="type=video&owner_uid=&since_id=([\d]*)">', video_page_data)
                     if len(since_id_data) == 1:
                         since_id = since_id_data[0]
                     else:
                         break
 
-            if video_count > 1 and last_video_url != "" and not is_over:
-                print_error_msg(account_name + " 视频数量异常")
-
-            # 如果有错误且没有发现新的图片，复原旧数据
-            if self.account_info[4] == "" and last_video_url != "":
-                self.account_info[4] = last_video_url
+            # 有历史记录，并且此次没有获得正常结束的标记，说明历史最后的视频已经被删除了
+            if video_count > 1 and first_video_url != "" and not is_over:
+                print_error_msg(account_name + " 没有找到上次下载的最后一个视频地址")
 
             # 图片
             image_count = 1
             page_count = 1
+            first_image_time = "0"
             is_over = False
             need_make_image_dir = True
             while (IS_DOWNLOAD_IMAGE == 1) and (not is_over):
-                photo_page_url = "http://photo.weibo.com/photos/get_all"
-                photo_page_url += "?uid=%s&count=%s&page=%s&type=3" % (account_id, IMAGE_COUNT_PER_PAGE, page_count)
-                photo_page_data = visit_weibo(photo_page_url)
-                trace(account_name + "相册地址：" + photo_page_url + "，返回JSON数据：" + str(photo_page_data))
-                try:
-                    page = json.loads(photo_page_data)
-                except AttributeError:
-                    print_error_msg(account_name + " 返回的图片列表不是一个JSON数据")
-                    break
+                # 获取指定一页图片的信息
+                photo_page_data = get_weibo_photo_page_data(account_id, page_count)
+                if not photo_page_data:
+                    print_error_msg(account_name + " 图片列表解析错误")
 
-                if not robot.check_sub_key("data", page):
-                    print_error_msg(account_name + " 图片列表解析错误" + str(page))
-                    break
-                if not robot.check_sub_key(("total", "photo_list"), page["data"]):
-                    print_error_msg(account_name + " 图片列表解析错误"  + str(page))
-                    break
-
+                trace(account_name + "第：" + str(page_count) + "页的全部图片信息：" + str(photo_page_data))
                 # 总的图片数
-                total_image_count = page["data"]["total"]
+                total_image_count = photo_page_data["total"]
                 # 图片详细列表
-                photo_list = page["data"]["photo_list"]
-
+                photo_list = photo_page_data["photo_list"]
                 for image_info in photo_list:
                     if not robot.check_sub_key(("pic_name", "timestamp"), image_info):
                         print_error_msg(account_name + " 图片列表解析错误")
                         break
-                    # 将第一张image的时间戳保存到新id list中
-                    if self.account_info[2] == "0":
-                        self.account_info[2] = str(image_info["timestamp"])
+                    # 将第一张图片的上传时间做为新的存档记录
+                    if first_image_time == "0":
+                        first_image_time = str(image_info["timestamp"])
                     # 检查是否图片时间小于上次的记录
-                    if 0 < last_image_time >= image_info["timestamp"]:
+                    if 0 < int(self.account_info[2]) >= int(image_info["timestamp"]):
                         is_over = True
                         break
 
+                    # 下载
+                    # todo 是否可以优化到一个方法中
                     if "pic_host" in image_info:
                         image_host = str(image_info["pic_host"])
                     else:
@@ -517,15 +526,12 @@ class Download(threading.Thread):
                         break
 
                 if not is_over:
+                    # 根据总的图片数量和每页显示的图片数量，计算是否还有下一页
                     if (total_image_count / IMAGE_COUNT_PER_PAGE) > (page_count - 1):
                         page_count += 1
                     else:
                         # 全部图片下载完毕
-                        break
-
-            # 如果有错误且没有发现新的图片，复原旧数据
-            if self.account_info[2] == "0" and last_image_time != 0:
-                self.account_info[2] = str(last_image_time)
+                        is_over = True
 
             print_step_msg(account_name + " 下载完毕，总共获得" + str(image_count - 1) + "张图片和" + str(video_count - 1) + "个视频")
 
@@ -546,8 +552,13 @@ class Download(threading.Thread):
                         print_error_msg(account_name + " 创建视频保存目录： " + destination_path + " 失败，程序结束！")
                         tool.process_exit()
 
-            self.account_info[1] = str(int(self.account_info[1]) + image_count - 1)
-            self.account_info[3] = str(int(self.account_info[3]) + video_count - 1)
+            # 新的存档记录
+            if first_image_time != "0":
+                self.account_info[1] = str(int(self.account_info[1]) + image_count - 1)
+                self.account_info[2] = first_image_time
+            if first_video_url != "":
+                self.account_info[3] = str(int(self.account_info[3]) + video_count - 1)
+                self.account_info[4] = first_video_url
 
             # 保存最后的信息
             threadLock.acquire()
