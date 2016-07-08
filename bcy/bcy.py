@@ -6,7 +6,9 @@ email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
 from common import log, robot, tool
+import base64
 import cookielib
+import json
 import os
 import re
 import threading
@@ -15,6 +17,7 @@ import traceback
 
 ACCOUNTS = []
 TOTAL_IMAGE_COUNT = 0
+GET_PAGE_COUNT = 0
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
 IS_DOWNLOAD_IMAGE = 1
@@ -41,7 +44,48 @@ def trace(msg):
     threadLock.release()
 
 
-def login(email, password):
+def get_account_info_from_console():
+    while True:
+        email = raw_input(tool.get_time() + " 请输入邮箱: ")
+        password = raw_input(tool.get_time() + " 请输入密码: ")
+        while True:
+            input_str = raw_input(tool.get_time() + " 是否使用这些信息（Y）或重新输入（N）: ")
+            input_str = input_str.lower()
+            if input_str in ["y", "yes"]:
+                return [email, password]
+            elif input_str in ["n", "no"]:
+                break
+            else:
+                pass
+
+
+def get_account_info_from_file():
+    if not os.path.exists("account.data"):
+        return False
+    file_handle = open("account.data", "r")
+    account_info = file_handle.read()
+    file_handle.close()
+    try:
+        account_info = json.loads(base64.b64decode(account_info))
+    except TypeError:
+        account_info = {}
+    except ValueError:
+        account_info = {}
+    if robot.check_sub_key(("email", "password"), account_info):
+        return [account_info["email"], account_info["password"]]
+    return [None, None]
+
+
+def login(from_where):
+    if from_where == 1:
+        email, password = get_account_info_from_file
+    else:
+        email, password = get_account_info_from_console()
+        account_info = base64.b64encode(json.dumps({"email": email, "password": password}))
+        file_handle = open("account.data", "w")
+        file_handle.write(account_info)
+        file_handle.close()
+
     cookie = cookielib.CookieJar()
     login_url = "http://bcy.net/public/dologin"
     login_post = {"email": email, "password": password}
@@ -75,6 +119,7 @@ def unfollow(account_id):
 
 class Bcy(robot.Robot):
     def __init__(self):
+        global GET_PAGE_COUNT
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
         global IS_DOWNLOAD_IMAGE
@@ -82,6 +127,7 @@ class Bcy(robot.Robot):
         super(Bcy, self).__init__()
 
         # 全局变量
+        GET_PAGE_COUNT = self.get_page_count
         IMAGE_DOWNLOAD_PATH = self.image_download_path
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
         IS_DOWNLOAD_IMAGE = self.is_download_image
@@ -199,10 +245,11 @@ class Download(threading.Thread):
             this_cn_total_image_count = 0
             page_count = 1
             max_page_count = -1
+            total_rp_count = 1
             first_rp_id = ""
             unique_list = []
-            need_make_download_dir = True  # 是否需要创建cn目录
             is_over = False
+            need_make_download_dir = True  # 是否需要创建cn目录
             while not is_over:
                 post_url = "http://bcy.net/u/%s/post/cos?&p=%s" % (coser_id, page_count)
                 [post_page_return_code, post_page_response] = tool.http_request(post_url)[:2]
@@ -303,7 +350,12 @@ class Download(threading.Thread):
 
                     this_cn_total_image_count += image_count - 1
 
-                    title_index += 1
+                    if 0 < GET_PAGE_COUNT < total_rp_count:
+                        is_over = True
+                        break
+                    else:
+                        title_index += 1
+                        total_rp_count += 1
 
                 if not is_over:
                     # 看看总共有几页
