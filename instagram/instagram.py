@@ -50,6 +50,25 @@ def trace(msg):
     threadLock.release()
 
 
+# 根据账号名字获得账号id（字母账号->数字账号)
+def get_account_id(account_name):
+    # index_url = "https://www.instagram.com/" + account_name
+    search_url = "https://www.instagram.com/web/search/topsearch/?context=blended&rank_token=1&query=" + account_name
+    search_return_code, search_data = tool.http_request(search_url)[:2]
+    if search_return_code == 1:
+        try:
+            search_data = json.loads(search_data)
+        except ValueError:
+            pass
+        else:
+            if robot.check_sub_key(("users", ), search_data):
+                for user in search_data["users"]:
+                    if robot.check_sub_key(("user", ), user) and robot.check_sub_key(("username", "pk"), user["user"]):
+                        if account_name == str(user["user"]["username"]):
+                            return user["user"]["pk"]
+    return None
+
+
 # 获取指定账号的全部粉丝列表（需要cookies）
 def get_instagram_follow_by_list(account_id):
     cursor = None
@@ -208,8 +227,8 @@ class Instagram(robot.Robot):
         # 寻找idlist，如果没有结束进程
         account_list = {}
         if os.path.exists(self.save_data_path):
-            # account_name  account_id  image_count  video_count  last_created_time
-            account_list = robot.read_save_data(self.save_data_path, 0, ["", "", "0", "0", "0"])
+            # account_name  image_count  video_count  last_created_time
+            account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0", "0"])
             ACCOUNTS = account_list.keys()
         else:
             print_error_msg("用户ID存档文件: " + self.save_data_path + "不存在")
@@ -279,7 +298,6 @@ class Download(threading.Thread):
         global TOTAL_VIDEO_COUNT
 
         account_name = self.account_info[0]
-        account_id = self.account_info[1]
 
         try:
             print_step_msg(account_name + " 开始")
@@ -291,6 +309,11 @@ class Download(threading.Thread):
             else:
                 image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
                 video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
+
+            account_id = get_account_id(account_name)
+            if account_id is None:
+                print_error_msg(account_name + " account id 查找失败")
+                tool.process_exit()
 
             image_count = 1
             video_count = 1
@@ -422,9 +445,9 @@ class Download(threading.Thread):
             print_step_msg(account_name + " 完成")
         except SystemExit, se:
             if se.code == 0:
-                print_step_msg(account_id + " 提前退出")
+                print_step_msg(account_name + " 提前退出")
             else:
-                print_error_msg(account_id + " 异常退出")
+                print_error_msg(account_name + " 异常退出")
         except Exception, e:
             print_step_msg(account_name + " 未知异常")
             print_error_msg(str(e) + "\n" + str(traceback.print_exc()))

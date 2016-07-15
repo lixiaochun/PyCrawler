@@ -386,30 +386,20 @@ class Download(threading.Thread):
                             image_url = str(image_url)
                             print_step_msg(account_id + " 开始下载第 " + str(image_count) + "张图片：" + image_url)
 
-                            # todo 是否可以优化到一个方法中
-                            image_return_code, image_response_data, image_response = tool.http_request(image_url)
+                            image_return_code, image_byte = tool.http_request(image_url)[:2]
                             # 404，不算做错误，图片已经被删掉了
                             if image_return_code == -404:
                                 print_error_msg(account_id + " 第" + str(image_count) + "张图片 " + image_url + "已被删除，跳过")
                             elif image_return_code == 1:
-                                image_time = get_image_last_modified(image_response)
-                                # 将第一张图片的上传时间做为新的存档记录
-                                if first_image_time == "0":
-                                    first_image_time = str(image_time)
-                                # 检查是否图片时间小于上次的记录
-                                if image_time <= int(self.account_info[2]):
-                                    is_over = True
-                                    break
-
                                 file_type = image_url.split(".")[-1].split(":")[0]
-                                file_path = os.path.join(image_path, str("%04d" % image_count) + "." + file_type)
+                                image_file_path = os.path.join(image_path, str("%04d" % image_count) + "." + file_type)
                                 # 第一张图片，创建目录
                                 if need_make_image_dir:
                                     if not tool.make_dir(image_path, 0):
                                         print_error_msg(account_id + " 创建图片下载目录： " + image_path + " 失败")
                                         tool.process_exit()
                                     need_make_image_dir = False
-                                save_image(image_response_data, file_path)
+                                save_image(image_byte, image_file_path)
                                 print_step_msg(account_id + " 第" + str(image_count) + "张图片下载成功")
                                 image_count += 1
                             else:
