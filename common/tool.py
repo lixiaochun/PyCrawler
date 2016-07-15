@@ -165,6 +165,14 @@ def get_default_browser_cookie_path(browser_type):
     return None
 
 
+# 根据key和value创建一个cookie
+def create_cookie(name, value, domain="", path="/"):
+    return cookielib.Cookie(version=0, name=name, value=value, port=None, port_specified=False, domain=domain,
+                            domain_specified=False, domain_initial_dot=False, path=path, path_specified=True,
+                            secure=False, expires=None, discard=True, comment=None, comment_url=None,
+                            rest={'HttpOnly': None}, rfc2109=False)
+
+
 # 使用系统cookies
 # browser_type=1: IE
 # browser_type=2: firefox
@@ -276,6 +284,31 @@ def set_proxy(ip, port, protocol):
     opener = urllib2.build_opener(proxy_handler)
     urllib2.install_opener(opener)
     print_msg("设置代理成功")
+
+
+# 快速设置cookie和代理
+# is_set_cookie     0:不设置, 1:设置
+# proxy_type        0:不设置, 1:http, 2:https
+def quickly_set(is_set_cookie, proxy_type):
+    import robot
+    config = robot.read_config()
+    if is_set_cookie == 1:
+        # 操作系统&浏览器
+        browser_type = robot.get_config(config, "BROWSER_VERSION", 2, 2)
+        # cookie
+        is_auto_get_cookie = robot.get_config(config, "IS_AUTO_GET_COOKIE", 1, 2)
+        if is_auto_get_cookie == 0:
+            cookie_path = robot.get_config(config, "COOKIE_PATH", "", 0)
+        else:
+            cookie_path = robot.tool.get_default_browser_cookie_path(browser_type)
+        set_cookie(cookie_path, browser_type)
+    if proxy_type > 0:
+        proxy_ip = robot.get_config(config, "PROXY_IP", "127.0.0.1", 0)
+        proxy_port = robot.get_config(config, "PROXY_PORT", "8087", 0)
+        if proxy_type == 1:
+            set_proxy(proxy_ip, proxy_port, "http")
+        elif proxy_type == 2:
+            set_proxy(proxy_ip, proxy_port, "https")
 
 
 # 控制台输出
