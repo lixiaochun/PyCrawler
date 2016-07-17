@@ -106,7 +106,13 @@ def get_tweet_list(media_page_items_html):
     tweet_data_list = media_page_items_html.split("\n")
     tweet_id_list = []
     for tweet_data in tweet_data_list:
-        if len(tweet_data) > 100:
+        if len(tweet_data) < 50:
+            continue
+        tweet_data = tweet_data.encode("utf-8")
+        # 被圈出来的用户，追加到前面的页面中
+        if tweet_data.find('<span class="button-text following-text">') >= 0:
+            tweet_id_list[-1] += tweet_data
+        else:
             tweet_id_list.append(tweet_data)
     return tweet_id_list
 
@@ -229,7 +235,7 @@ class Twitter(robot.Robot):
         account_list = {}
         if os.path.exists(self.save_data_path):
             # account_id  image_count  last_image_time
-            account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0"])
+            account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0", "0"])
             ACCOUNTS = account_list.keys()
         else:
             print_error_msg("用户ID存档文件: " + self.save_data_path + "不存在")
@@ -327,8 +333,8 @@ class Download(threading.Thread):
 
                 tweet_list = get_tweet_list(media_page["items_html"])
                 if len(tweet_list) == 0:
-                    print_error_msg(account_id + " 媒体列表拆分异常")
-                    continue
+                    print_error_msg(account_id + " 媒体列表拆分异常，items_html：" + str(media_page["items_html"]))
+                    break
 
                 for tweet_data in tweet_list:
                     tweet_id_find = re.findall('data-tweet-id="([\d]*)"', tweet_data)
@@ -380,7 +386,7 @@ class Download(threading.Thread):
                     # 图片
                     if IS_DOWNLOAD_IMAGE == 1:
                         # 匹配获取全部的图片地址
-                        image_url_list = re.findall('data-image-url="([^"]*)"', media_page["items_html"])
+                        image_url_list = re.findall('data-image-url="([^"]*)"', tweet_data)
                         for image_url in image_url_list:
                             image_url = str(image_url)
                             print_step_msg(account_id + " 开始下载第 " + str(image_count) + "张图片：" + image_url)
@@ -457,8 +463,8 @@ class Download(threading.Thread):
             else:
                 print_error_msg(account_id + " 异常退出")
         except Exception, e:
-            print_step_msg(account_id + " 未知异常")
-            print_error_msg(str(e) + "\n" + str(traceback.print_exc()))
+            print_error_msg(account_id + " 未知异常")
+            print_error_msg(str(e) + "\n" + str(traceback.format_exc()))
 
 
 if __name__ == "__main__":
