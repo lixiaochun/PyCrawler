@@ -54,18 +54,20 @@ def trace(msg):
 def get_account_id(account_name):
     # index_url = "https://www.instagram.com/" + account_name
     search_url = "https://www.instagram.com/web/search/topsearch/?context=blended&rank_token=1&query=" + account_name
-    search_return_code, search_data = tool.http_request(search_url)[:2]
-    if search_return_code == 1:
-        try:
-            search_data = json.loads(search_data)
-        except ValueError:
-            pass
-        else:
-            if robot.check_sub_key(("users", ), search_data):
-                for user in search_data["users"]:
-                    if robot.check_sub_key(("user", ), user) and robot.check_sub_key(("username", "pk"), user["user"]):
-                        if account_name == str(user["user"]["username"]):
-                            return user["user"]["pk"]
+    for i in range(0, 10):
+        search_return_code, search_data = tool.http_request(search_url)[:2]
+        if search_return_code == 1:
+            try:
+                search_data = json.loads(search_data)
+            except ValueError:
+                pass
+            else:
+                if robot.check_sub_key(("users", ), search_data):
+                    for user in search_data["users"]:
+                        if robot.check_sub_key(("user", ), user) and robot.check_sub_key(("username", "pk"), user["user"]):
+                            if account_name == str(user["user"]["username"]):
+                                return user["user"]["pk"]
+        time.sleep(5)
     return None
 
 
@@ -155,7 +157,7 @@ def get_instagram_follow_list_page_data(account_id, cursor=None):
 def get_instagram_media_page_data(account_id, cursor):
     media_page_url = "https://www.instagram.com/query/"
     # node支持的字段：caption,code,comments{count},date,dimensions{height,width},display_src,id,is_video,likes{count},owner{id},thumbnail_src,video_views
-    media_page_url += "?q=ig_user(%s){media.after(%s,%s){nodes{code,date,display_src,is_video},page_info}}" % (account_id, IMAGE_COUNT_PER_PAGE, cursor)
+    media_page_url += "?q=ig_user(%s){media.after(%s,%s){nodes{code,date,display_src,is_video},page_info}}" % (account_id, cursor, IMAGE_COUNT_PER_PAGE)
     photo_page_return_code, media_page_response = tool.http_request(media_page_url)[:2]
     if photo_page_return_code == 1:
         try:
