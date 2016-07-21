@@ -173,7 +173,7 @@ def get_instagram_media_page_data(account_id, cursor):
 
 
 class Instagram(robot.Robot):
-    def __init__(self):
+    def __init__(self, extra_config=None):
         global GET_IMAGE_COUNT
         global IMAGE_TEMP_PATH
         global IMAGE_DOWNLOAD_PATH
@@ -184,9 +184,9 @@ class Instagram(robot.Robot):
         global IS_DOWNLOAD_IMAGE
         global IS_DOWNLOAD_VIDEO
 
-        super(Instagram, self).__init__()
+        robot.Robot.__init__(self, extra_config)
 
-        # 全局变量
+        # 设置全局变量，供子线程调用
         GET_IMAGE_COUNT = self.get_image_count
         IMAGE_TEMP_PATH = self.image_temp_path
         IMAGE_DOWNLOAD_PATH = self.image_download_path
