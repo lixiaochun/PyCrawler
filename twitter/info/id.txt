@@ -10,10 +10,3 @@ nahachi_078	702	0	1460556747	肉球あやとさん	保护
 
 
 
-
-96__neko save1 -> save4
-hinachimuu save1 -> save4
-save2 -> save3
-save3 -> save4
-rino_sashihara	delete
-
