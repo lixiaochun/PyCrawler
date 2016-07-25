@@ -15,30 +15,30 @@ def akb():
         index_url = "http://www.akb48.co.jp/about/members/?team_id=" + str(team_id)
         return_code, page = tool.http_request(index_url)[:2]
         if return_code == 1:
-            member_list_find = re.findall('<ul class="memberListUl">([\s|\S]*?)</ul>', page)
-            if len(member_list_find) == 1:
-                member_list = re.findall("<li>([\s|\S]*?)</li>", member_list_find[0])
+            member_list_page = tool.find_sub_string(page, '<ul class="memberListUl">', '</ul>')
+            if member_list_page:
+                member_list = re.findall("<li>([\s|\S]*?)</li>", member_list_page)
                 for member in member_list:
                     member = member.replace("<br />", "").replace("\n", "").replace("\r", "").replace("\t", "")
-                    japanese_name_find = re.findall('<h4 class="memberListNamej">([^<]*)</h4>', member)
-                    english_name_find = re.findall('<p class="memberListNamee">([^<]*)</p>', member)
+                    japanese_name = tool.find_sub_string(member, '<h4 class="memberListNamej">', '</h4>')
+                    english_name = tool.find_sub_string(member, '<p class="memberListNamee">', '</p>')
                     team_find = re.findall('<h5 class="memberListTeam">([^<]*)</h5>', member)
-                    if len(japanese_name_find) != 1:
-                        print "error japanese_name_find"
+                    if not japanese_name:
+                        print "error japanese_name"
                         continue
-                    if len(english_name_find) != 1:
-                        print "error english_name_find"
+                    if not english_name:
+                        print "error english_name"
                         continue
                     if (team_id != 12 and len(team_find) != 1) or (team_id == 12 and len(team_find) != 2):
                         print "error team_find"
                         continue
 
-                    japanese_name = japanese_name_find[0].replace(" ", "")
-                    first_name, last_name = english_name_find[0].split(" ", 1)
+                    japanese_name = japanese_name.replace(" ", "")
+                    first_name, last_name = english_name.split(" ", 1)
                     team = team_find[0].strip().replace("  /", " / ")
                     members_list.append([japanese_name, last_name + " " + first_name, team])
             else:
-                print "error member_list_find"
+                print "error member_list_page"
     return members_list
 
 
@@ -54,27 +54,24 @@ def ske():
     return_code, page = tool.http_request(index_url)[:2]
     if return_code == 1:
         for team_name in split_list:
-            team_page = page[page.find(split_list[team_name][0]):page.find(split_list[team_name][1])]
+            team_page = tool.find_sub_string(page, split_list[team_name][0], split_list[team_name][1])
             member_list = re.findall('<dl>([\s|\S]*?)</dl>', team_page)
             for member in member_list:
                 member = member.replace("<br />", "").replace("\n", "").replace("\r", "").replace("\t", "")
                 japanese_name_find = re.findall('<h3><a href="./\?id=[^"]*">([^<]*)</a></h3>', member)
-                english_name_find = re.findall('<h3 class="en">([^<]*)</h3>', member)
-                plus_text_find = re.findall('<li class="textPlus">([\s|\S]*?)</li>', member)
+                english_name = tool.find_sub_string(member, '<h3 class="en">', '</h3>')
+                plus_text = tool.find_sub_string(member, '<li class="textPlus">', '</li>')
                 if len(japanese_name_find) != 1:
                     print "error japanese_name_find"
                     continue
-                if len(english_name_find) != 1:
-                    print "error english_name_find"
-                    continue
-                if len(plus_text_find) != 1:
-                    print "error plus_text_find"
+                if not english_name:
+                    print "error english_name"
                     continue
 
                 japanese_name = japanese_name_find[0].replace(" ", "")
-                first_name, last_name = english_name_find[0].strip().title().split(" ", 1)
-                if plus_text_find[0].find("兼任") > 0:
-                    team = team_name + " / " + plus_text_find[0].split("/")[-1].strip().replace("チーム", " Team ").replace("兼任", "")
+                first_name, last_name = english_name.strip().title().split(" ", 1)
+                if plus_text and plus_text.find("兼任") > 0:
+                    team = team_name + " / " + plus_text.split("/")[-1].strip().replace("チーム", " Team ").replace("兼任", "")
                 else:
                     team = team_name
                 members_list.append([japanese_name, last_name + " " + first_name, team])
@@ -95,10 +92,10 @@ def nmb():
     if return_code == 1:
         team_page_list = re.findall('<!--▼チーム別領域ボックス▼-->([\s|\S]*?)<!--▲チーム別領域ボックス▲--> ', page)
         for team_page in team_page_list:
-            team_find = re.findall('<a name="([^"]*)"></a>', team_page)
-            if len(team_find) == 1:
-                if team_find[0] not in team_list:
-                    print "not found " + team_find[0] + " in team_list"
+            team_find = tool.find_sub_string(team_page, '<a name="', '"></a>')
+            if team_find:
+                if team_find not in team_list:
+                    print "not found " + team_find + " in team_list"
                     continue
                 member_list = re.findall('<li class="member-box[^"]*">([\s|\S]*?)</li>', team_page)
                 for member in member_list:
@@ -112,7 +109,7 @@ def nmb():
                         print "error english_name_find"
                         continue
 
-                    team = team_list[team_find[0]]
+                    team = team_list[team_find]
                     if english_name_find[0].find("<span>") >= 0:
                         temp = english_name_find[0].split("<span>")
                         english_name_find[0] = temp[0]
@@ -134,11 +131,11 @@ def hkt():
     if return_code == 1:
         team_find = re.findall('(<h3>[\s|\S]*?)<!-- / .contsbox --></div>', page)
         for team_page in team_find:
-            team_name_find = re.findall("<h3>([^<]*)</h3>", team_page)
-            if len(team_name_find) != 1:
-                print "error team_name_find"
+            team = tool.find_sub_string(team_page, "<h3>", "</h3>")
+            if not team:
+                print "error team"
                 continue
-            team = team_name_find[0].strip()
+            team = team.strip()
             member_list = re.findall("<li>([\s|\S]*?)</li>", team_page)
             for member in member_list:
                 member = member.replace("<br />", "").replace("\n", "").replace("\r", "").replace("\t", "")
@@ -157,11 +154,44 @@ def hkt():
                 members_list.append([japanese_name, last_name + " " + first_name, team_name])
     return members_list
 
+
+def jkt():
+    members_list = []
+    index_url = "http://www.jkt48.com/member/list"
+    return_code, page = tool.http_request(index_url)[:2]
+    if return_code == 1:
+        page = tool.find_sub_string(page, '<div id="mainCol">', "<!--end #mainCol-->", 1)
+        start_index = 0
+        start_index_list = []
+        while start_index != -1:
+            start_index = page.find('<a name="', start_index + 1)
+            start_index_list.append(start_index)
+        for i in range(0, len(start_index_list) - 1):
+            start = start_index_list[i]
+            end = start_index_list[i + 1]
+            if end == -1:
+                end = len(page)
+            split_page = page[start: end]
+            team_name = tool.find_sub_string(split_page, "<h2>", "</h2>")
+            if team_name.find("Team") == -1:
+                team_name = "Team kenkyusei"
+            team_name = "JKT48 " + team_name
+            member_list = re.findall('<div class="profileWrap">([\s|\S]*?)</div><!--/loop-->',split_page)
+            for member in member_list:
+                member = member.replace("<br>", "").replace("\n", "").replace("\r", "").replace("\t", "")
+                japanese_name = english_name = tool.find_sub_string(member, 'alt="', '"')
+                members_list.append([japanese_name, english_name, team_name])
+    return members_list
+
+
+
+
 result = []
 result += akb()
 result += ske()
 result += nmb()
 result += hkt()
+result += jkt()
 file_handle = open('member.txt', 'w')
 for line in result:
     line_string = "\t".join(line)
