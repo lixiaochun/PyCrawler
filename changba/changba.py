@@ -1,6 +1,6 @@
 # -*- coding:UTF-8  -*-
 """
-秒拍视频爬虫
+唱吧视频爬虫
 @author: hikaru
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
@@ -19,7 +19,6 @@ GET_VIDEO_COUNT = 0
 VIDEO_TEMP_PATH = ""
 VIDEO_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 
 threadLock = threading.Lock()
 
@@ -42,47 +41,67 @@ def print_step_msg(msg):
     threadLock.release()
 
 
-# 获取用户的suid，作为查找指定用户的视频页的凭着
-def get_miaopai_suid(account_id):
-    index_page_url = "http://www.miaopai.com/u/paike_%s" % account_id
-    index_page_return_code, index_page = tool.http_request(index_page_url)[:2]
-    if index_page_return_code == 1:
-        suid = tool.find_sub_string(index_page, '<button class="guanzhu gz" suid="', '" heade="1" token="">\+关注</button>')
-        if suid:
-            return suid
+# 根据account_id获取user_id
+def get_user_id(account_id):
+    index_url = "http://changba.com/u/" + account_id
+    index_return_code, index_page = tool.http_request(index_url)[:2]
+    if index_return_code == 1:
+        user_id = tool.find_sub_string(index_page, "var userid = '", "'")
+        if user_id:
+            return user_id
     return None
 
 
-# 获取一页的视频信息
-def get_miaopai_video_page_data(suid, page_count):
-    media_page_url = "http://www.miaopai.com/gu/u?page=%s&suid=%s&fen_type=channel" % (page_count, suid)
-    media_page_return_code, media_page = tool.http_request(media_page_url)[:2]
-    if media_page_return_code == 1:
+# 获取一页的歌曲信息
+def get_changba_audio_list(user_id, page_count):
+    audio_album_url = "http://changba.com/member/personcenter/loadmore.php?userid=%s&pageNum=%s" % (user_id, page_count)
+    audio_album_return_code, audio_album_page = tool.http_request(audio_album_url)[:2]
+    audio_list = []
+    if audio_album_return_code == 1:
         try:
-            media_page = json.loads(media_page)
+            audio_album_page = json.loads(audio_album_page)
         except ValueError:
             pass
         else:
-            if robot.check_sub_key(("isall", "msg"), media_page):
-                return media_page
+            for audio_info in audio_album_page:
+                if robot.check_sub_key(("songname", "workid", "enworkid"), audio_info):
+                    audio_list.append([str(audio_info["workid"]), audio_info["songname"].encode("utf-8"), str(audio_info["enworkid"])])
+    return audio_list
+
+
+# 获取歌曲的真实下载地址
+def get_audio_source_url(audio_en_word_id):
+    audio_index_url = "http://changba.com/s/" + audio_en_word_id
+    audio_index_return_code, audio_index_page = tool.http_request(audio_index_url)[:2]
+    if audio_index_return_code == 1:
+        audio_source_url = tool.find_sub_string(audio_index_page, 'var a="', '"')
+        if audio_source_url:
+            # 从JS处解析的规则
+            special_find = re.findall("userwork\/([abc])(\d+)\/(\w+)\/(\w+)\.mp3", audio_source_url)
+            if len(special_find) == 0:
+                return audio_source_url
+            elif len(special_find) == 1:
+                e = int(special_find[0][1], 8)
+                f = int(special_find[0][2], 16) / e / e
+                g = int(special_find[0][3], 16) / e / e
+                if "a" == special_find[0][0] and g % 1000 == f:
+                    return "http://a%smp3.changba.com/userdata/userwork/%s/%g.mp3" % (e, f, g)
+                return "http://aliuwmp3.changba.com/userdata/userwork/%s.mp3" % (g)
     return None
 
 
-class MiaoPai(robot.Robot):
+class ChangBa(robot.Robot):
     def __init__(self):
         global GET_VIDEO_COUNT
-        global VIDEO_TEMP_PATH
         global VIDEO_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
+        global IS_DOWNLOAD_VIDEO
 
         robot.Robot.__init__(self)
 
         # 设置全局变量，供子线程调用
         GET_VIDEO_COUNT = self.get_video_count
-        VIDEO_TEMP_PATH = self.video_temp_path
         VIDEO_DOWNLOAD_PATH = self.video_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
         tool.print_msg("配置文件读取完成")
@@ -114,8 +133,8 @@ class MiaoPai(robot.Robot):
         # 寻找存档，如果没有结束进程
         account_list = {}
         if os.path.exists(self.save_data_path):
-            # account_id  video_count  last_video_url
-            account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0", ""])
+            # account_id  last_audio_id
+            account_list = robot.read_save_data(self.save_data_path, 0, ["", "0"])
             ACCOUNTS = account_list.keys()
         else:
             print_error_msg("存档文件：" + self.save_data_path + "不存在")
@@ -187,64 +206,57 @@ class Download(threading.Thread):
         try:
             print_step_msg(account_id + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                video_path = os.path.join(VIDEO_TEMP_PATH, account_id)
-            else:
-                video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_id)
+            video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_id)
 
-            suid = get_miaopai_suid(account_id)
-            if suid is None:
-                print_error_msg(account_id + " suid获取失败")
+            user_id = get_user_id(account_id)
+            if user_id is None:
+                print_error_msg(account_id + " userid获取失败")
+                tool.process_exit()
 
-            page_count = 1
+            page_count = 0
             video_count = 1
-            first_video_scid = ""
+            first_audio_id = "0"
             unique_list = []
             is_over = False
             need_make_download_dir = True
-            while suid != "" and (not is_over):
+            while not is_over:
                 # 获取指定一页的视频信息
-                media_page = get_miaopai_video_page_data(suid, page_count)
-                if media_page is None:
-                    print_error_msg(account_id + " 视频列表解析错误")
-                    tool.process_exit()
+                audio_list = get_changba_audio_list(user_id, page_count)
 
-                msg_data = media_page["msg"]
-                scid_list = re.findall('data-scid="([^"]*)"', msg_data)
-                if len(scid_list) == 0:
-                    print_error_msg(account_id + " 在视频列表：" + str(media_page) + " 中没有找到视频scid")
-                    tool.process_exit()
+                # 如果为空，表示已经取完了
+                if len(audio_list) == 0:
+                    break
 
-                for scid in scid_list:
-                    # 新增视频导致的重复判断
-                    if scid in unique_list:
+                for audio_info in audio_list:
+                    audio_id = audio_info[0]
+                    # 新增歌曲导致的重复判断
+                    if audio_id in unique_list:
                         continue
                     else:
-                        unique_list.append(scid)
-                    # 将第一个视频的id做为新的存档记录
-                    if first_video_scid == "":
-                        first_video_scid = scid
-                    # 检查是否已下载到前一次的图片
-                    if first_video_scid == self.account_info[2]:
+                        unique_list.append(audio_id)
+                    # 将第一首歌曲id做为新的存档记录
+                    if first_audio_id == "0":
+                        first_audio_id = str(audio_id)
+                    # 检查是否歌曲id小于上次的记录
+                    if int(audio_id) <= int(self.account_info[1]):
                         is_over = True
                         break
 
-                    video_url = "http://wsqncdn.miaopai.com/stream/%s.mp4" % str(scid)
-                    print_step_msg(account_id + " 开始下载第 " + str(video_count) + "个视频：" + video_url)
+                    audio_url = get_audio_source_url(audio_info[2])
 
-                    file_path = os.path.join(video_path, str("%04d" % video_count) + ".mp4")
+                    print_step_msg(account_id + " 开始下载第 " + str(video_count) + "首歌曲：" + audio_url)
+                    file_path = os.path.join(video_path, "%s - %s.mp4" % (audio_id, audio_info[1]))
                     # 第一个视频，创建目录
                     if need_make_download_dir:
                         if not tool.make_dir(video_path, 0):
                             print_error_msg(account_id + " 创建视频下载目录： " + video_path + " 失败")
                             tool.process_exit()
                         need_make_download_dir = False
-                    if tool.save_net_file(video_url, file_path):
-                        print_step_msg(account_id + " 第" + str(video_count) + "个视频下载成功")
+                    if tool.save_net_file(audio_url, file_path):
+                        print_step_msg(account_id + " 第" + str(video_count) + "首歌曲下载成功")
                         video_count += 1
                     else:
-                        print_error_msg(account_id + " 第" + str(video_count) + "个视频 " + video_url + " 下载失败")
+                        print_error_msg(account_id + " 第" + str(video_count) + "首歌曲 " + audio_url + " 下载失败")
 
                     # 达到配置文件中的下载数量，结束
                     if 0 < GET_VIDEO_COUNT < video_count:
@@ -252,26 +264,18 @@ class Download(threading.Thread):
                         break
 
                 if not is_over:
-                    if media_page["isall"]:
+                    # 获取的歌曲数量少于1页的上限，表示已经到结束了
+                    # 如果歌曲数量正好是页数上限的倍数，则由下一页获取是否为空判断
+                    if len(audio_list) < 20:
                         is_over = True
                     else:
                         page_count += 1
 
             print_step_msg(account_id + " 下载完毕，总共获得" + str(video_count - 1) + "个视频")
 
-            # 排序
-            if IS_SORT and video_count > 1:
-                destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_id)
-                if robot.sort_file(video_path, destination_path, int(self.account_info[1]), 4):
-                    print_step_msg(account_id + " 视频从下载目录移动到保存目录成功")
-                else:
-                    print_error_msg(account_id + " 创建视频保存目录： " + destination_path + " 失败")
-                    tool.process_exit()
-
             # 新的存档记录
-            if first_video_scid != "":
-                self.account_info[1] = str(int(self.account_info[1]) + video_count - 1)
-                self.account_info[2] = first_video_scid
+            if first_audio_id != "0":
+                self.account_info[1] = first_audio_id
 
             # 保存最后的信息
             threadLock.acquire()
@@ -292,4 +296,4 @@ class Download(threading.Thread):
 
 
 if __name__ == "__main__":
-    MiaoPai().main()
+    ChangBa().main()

@@ -19,8 +19,7 @@ GET_VIDEO_COUNT = 0
 VIDEO_TEMP_PATH = ""
 VIDEO_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = 1
-IS_DOWNLOAD_VIDEO = 1
+IS_SORT = True
 
 threadLock = threading.Lock()
 
@@ -59,14 +58,13 @@ def get_meipai_video_page_data(account_id, page_count):
     return None
 
 
-class Meipai(robot.Robot):
+class MeiPai(robot.Robot):
     def __init__(self):
         global GET_VIDEO_COUNT
         global VIDEO_TEMP_PATH
         global VIDEO_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
         global IS_SORT
-        global IS_DOWNLOAD_VIDEO
 
         robot.Robot.__init__(self)
 
@@ -75,7 +73,6 @@ class Meipai(robot.Robot):
         VIDEO_TEMP_PATH = self.video_temp_path
         VIDEO_DOWNLOAD_PATH = self.video_download_path
         IS_SORT = self.is_sort
-        IS_DOWNLOAD_VIDEO = self.is_download_video
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
         tool.print_msg("配置文件读取完成")
@@ -85,12 +82,15 @@ class Meipai(robot.Robot):
 
         start_time = time.time()
 
-        # 视频保存目录
-        if IS_DOWNLOAD_VIDEO == 1:
-            print_step_msg("创建视频根目录：" + VIDEO_DOWNLOAD_PATH)
-            if not tool.make_dir(VIDEO_DOWNLOAD_PATH, 0):
-                print_error_msg("创建视频根目录：" + VIDEO_DOWNLOAD_PATH + " 失败")
-                tool.process_exit()
+        if not self.is_download_video:
+            print_error_msg("下载视频没有开启，请检查配置！")
+            tool.process_exit()
+
+        # 创建视频保存目录
+        print_step_msg("创建视频根目录：" + VIDEO_DOWNLOAD_PATH)
+        if not tool.make_dir(VIDEO_DOWNLOAD_PATH, 0):
+            print_error_msg("创建视频根目录：" + VIDEO_DOWNLOAD_PATH + " 失败")
+            tool.process_exit()
 
         # 设置代理
         if self.is_proxy == 1:
@@ -178,7 +178,7 @@ class Download(threading.Thread):
             print_step_msg(account_id + " 开始")
 
             # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT == 1:
+            if IS_SORT:
                 video_path = os.path.join(VIDEO_TEMP_PATH, account_id)
             else:
                 video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_id)
@@ -245,7 +245,7 @@ class Download(threading.Thread):
             print_step_msg(account_id + " 下载完毕，总共获得" + str(video_count - 1) + "个视频")
 
             # 排序
-            if IS_SORT == 1 and video_count > 1:
+            if IS_SORT and video_count > 1:
                 destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_id)
                 if robot.sort_file(video_path, destination_path, int(self.account_info[1]), 4):
                     print_step_msg(account_id + " 视频从下载目录移动到保存目录成功")
@@ -277,4 +277,4 @@ class Download(threading.Thread):
 
 
 if __name__ == "__main__":
-    Meipai().main()
+    MeiPai().main()
