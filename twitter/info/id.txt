@@ -1,5 +1,4 @@
 YYRRYYRR1122	315	1459599228	小鹰狩佑香	404
-isoharakyoka	117	1454287477	磯原杏華	404
 isoharakyoka8	67	1459303617	磯原杏華	404
 miku_aikawa	992	0	1466808211	逢川みく	404
 RevfromDVLkanna	596	0	1465216765	橋本環奈	404
@@ -7,6 +6,6 @@ yukos_cook	1380	0	菅本裕子	保护
 smallstonechan	204	0	1458572402	小石公美子	保护
 rei_kusakusa	0	0	山田澪花	保护get
 nahachi_078	702	0	1460556747	肉球あやとさん	保护
-
-
-
+aoki_shiori	0	0	0	青木詩織	保护
+isoharakyoka	117	1454287477	磯原杏華
+smallstonechan	0	0	0	小石公美子
