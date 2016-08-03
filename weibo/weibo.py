@@ -69,13 +69,13 @@ def md5(file_byte):
 
 
 # 访问微博域名网页，自动判断是否需要跳转
-def visit_weibo(url):
+def auto_redirect_visit(url):
     page_return_code, page_response = tool.http_request(url)[:2]
     if page_return_code == 1:
         # 有重定向
         redirect_url_find = re.findall('location.replace\(["|\']([^"|^\']*)["|\']\)', page_response)
         if len(redirect_url_find) == 1:
-            return visit_weibo(redirect_url_find[0])
+            return auto_redirect_visit(redirect_url_find[0])
         # 没有cookies无法访问的处理
         if page_response.find("用户名或密码错误") != -1:
             print_error_msg("登陆状态异常，请在浏览器中重新登陆微博账号")
@@ -96,10 +96,10 @@ def visit_weibo(url):
 
 
 # 获取一页的图片信息
-def get_weibo_photo_page_data(account_id, page_count):
+def get_photo_page_data(account_id, page_count):
     photo_page_url = "http://photo.weibo.com/photos/get_all"
     photo_page_url += "?uid=%s&count=%s&page=%s&type=3" % (account_id, IMAGE_COUNT_PER_PAGE, page_count)
-    photo_page_data = visit_weibo(photo_page_url)
+    photo_page_data = auto_redirect_visit(photo_page_url)
     try:
         page = json.loads(photo_page_data)
     except ValueError:
@@ -112,10 +112,10 @@ def get_weibo_photo_page_data(account_id, page_count):
 
 
 # 获取账号对应的page_id
-def get_weibo_account_page_id(account_id):
+def get_account_page_id(account_id):
     for i in range(0, 50):
         index_url = "http://weibo.com/u/%s?is_all=1" % account_id
-        index_page = visit_weibo(index_url)
+        index_page = auto_redirect_visit(index_url)
         if index_page:
             page_id = tool.find_sub_string(index_page, "$CONFIG['page_id']='", "'")
             if page_id:
@@ -125,11 +125,11 @@ def get_weibo_account_page_id(account_id):
 
 
 # 获取一页的视频信息
-def get_weibo_video_page_data(page_id, since_id):
+def get_video_page_data(page_id, since_id):
     video_album_url = "http://weibo.com/p/aj/album/loading"
     video_album_url += "?type=video&since_id=%s&page_id=%s&page=1&ajax_call=1" % (since_id, page_id)
     for i in range(0, 50):
-        video_page = visit_weibo(video_album_url)
+        video_page = auto_redirect_visit(video_album_url)
         if video_page:
             try:
                 video_page = json.loads(video_page)
@@ -153,17 +153,17 @@ def find_real_video_url(video_page_url, account_name):
     elif video_page_url.find("video.weibo.com/show?fid=") >= 0:  # 微博视频
         # 多次尝试，在多线程访问的时候有较大几率无法返回正确的信息
         for i in range(0, 50):
-            source_video_page = visit_weibo(video_page_url)
+            source_video_page = auto_redirect_visit(video_page_url)
             if source_video_page:
                 ssig_file_url = tool.find_sub_string(source_video_page, 'flashvars=\\"file=', '\\"')
                 if ssig_file_url:
-                    ssig_file_page = visit_weibo(urllib2.unquote(ssig_file_url))
+                    ssig_file_page = auto_redirect_visit(urllib2.unquote(ssig_file_url))
                     if ssig_file_page:
                         ssig_list = re.findall("\s([^#]\S*)", ssig_file_page)
                         if len(ssig_list) >= 1:
                             video_source_url = []
                             for ssig in ssig_list:
-                                video_source_url.append("http://us.sinaimg.cn/" + ssig)
+                                video_source_url.append("http://us.sinaimg.cn/%s" % ssig)
                             return 1, video_source_url
             time.sleep(5)
         return -1, []
@@ -262,16 +262,16 @@ class Weibo(robot.Robot):
 
         # 创建图片保存目录
         if IS_DOWNLOAD_IMAGE:
-            print_step_msg("创建图片根目录：" + IMAGE_DOWNLOAD_PATH)
+            print_step_msg("创建图片根目录 %s" % IMAGE_DOWNLOAD_PATH)
             if not tool.make_dir(IMAGE_DOWNLOAD_PATH, 0):
-                print_error_msg("创建图片根目录：" + IMAGE_DOWNLOAD_PATH + " 失败")
+                print_error_msg("创建图片根目录 %s 失败" % IMAGE_DOWNLOAD_PATH)
                 tool.process_exit()
 
         # 创建视频保存目录
         if IS_DOWNLOAD_VIDEO:
-            print_step_msg("创建视频根目录：" + VIDEO_DOWNLOAD_PATH)
+            print_step_msg("创建视频根目录 %s" % VIDEO_DOWNLOAD_PATH)
             if not tool.make_dir(VIDEO_DOWNLOAD_PATH, 0):
-                print_error_msg("创建视频根目录：" + VIDEO_DOWNLOAD_PATH + " 失败")
+                print_error_msg("创建视频根目录 %s 失败" % VIDEO_DOWNLOAD_PATH)
                 tool.process_exit()
 
         # 设置代理
@@ -290,7 +290,7 @@ class Weibo(robot.Robot):
             account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0", "0", ""])
             ACCOUNTS = account_list.keys()
         else:
-            print_error_msg("存档文件：" + self.save_data_path + "不存在")
+            print_error_msg("存档文件 %s 不存在" % self.save_data_path)
             tool.process_exit()
 
         # 创建临时存档文件
@@ -298,7 +298,7 @@ class Weibo(robot.Robot):
         new_save_data_file.close()
 
         # 先访问下页面，产生cookies
-        visit_weibo("http://www.weibo.com/")
+        auto_redirect_visit("http://www.weibo.com/")
         time.sleep(2)
 
         # 启用线程监控是否需要暂停其他下载线程
@@ -348,7 +348,7 @@ class Weibo(robot.Robot):
         os.remove(NEW_SAVE_DATA_PATH)
 
         duration_time = int(time.time() - start_time)
-        print_step_msg("全部下载完毕，耗时" + str(duration_time) + "秒，共计图片" + str(TOTAL_IMAGE_COUNT) + "张，视频" + str(TOTAL_VIDEO_COUNT) + "个")
+        print_step_msg("全部下载完毕，耗时%s秒，共计图片%s张，视频%s个" % (duration_time, TOTAL_IMAGE_COUNT, TOTAL_VIDEO_COUNT))
 
 
 class Download(threading.Thread):
@@ -387,13 +387,13 @@ class Download(threading.Thread):
             while IS_DOWNLOAD_VIDEO and (not is_over):
                 # 获取page_id
                 if page_id is None:
-                    page_id = get_weibo_account_page_id(account_id)
+                    page_id = get_account_page_id(account_id)
                     if page_id is None:
                         print_error_msg(account_name + " 微博主页没有获取到page_id")
                         break
 
                 # 获取指定时间点后的一页视频信息
-                video_page_data = get_weibo_video_page_data(page_id, since_id)
+                video_page_data = get_video_page_data(page_id, since_id)
                 if video_page_data is None:
                     print_error_msg(account_name + " 视频列表解析异常")
                     first_video_url = ""  # 存档恢复
@@ -401,7 +401,7 @@ class Download(threading.Thread):
 
                 # 匹配获取全部的视频页面
                 video_page_url_list = re.findall('<a target="_blank" href="([^"]*)"><div ', video_page_data)
-                trace(account_name + "since_id：" + since_id + "中的全部视频：" + str(video_page_url_list))
+                trace(account_name + "since_id：%s中的全部视频：%s" % (since_id, video_page_url_list))
                 for video_page_url in video_page_url_list:
                     # 将第一个视频的地址做为新的存档记录
                     if first_video_url == "":
@@ -414,28 +414,28 @@ class Download(threading.Thread):
                     return_code, video_source_url_list = find_real_video_url(video_page_url, account_name)
                     if return_code != 1:
                         if return_code == -1:
-                            print_error_msg(account_name + " 第" + str(video_count) + "个视频：" + video_page_url + "没有获取到源地址")
+                            print_error_msg(account_name + " 第%s个视频 %s 没有获取到源地址" % (video_count, video_page_url))
                         elif return_code == -2:
-                            print_error_msg(account_name + " 第" + str(video_count) + "个视频：" + video_page_url + "无法访问")
+                            print_error_msg(account_name + " 第%s个视频 %s 无法访问" % (video_count, video_page_url))
                         elif return_code == -3:
-                            print_error_msg(account_name + " 第" + str(video_count) + "个视频：" + video_page_url + "，暂不支持的视频源")
+                            print_error_msg(account_name + " 第%s个视频 %s 暂不支持的视频源" % (video_count, video_page_url))
                         continue
                     # 下载
                     for video_source_url in video_source_url_list:
-                        print_step_msg(account_name + " 开始下载第" + str(video_count) + "个视频：" + video_page_url)
+                        print_step_msg(account_name + " 开始下载第%s个视频 %s" % (video_count, video_page_url))
 
-                        video_file_path = os.path.join(video_path, str("%04d" % video_count) + ".mp4")
+                        video_file_path = os.path.join(video_path, "%04d.mp4" % video_count)
                         # 第一个视频，创建目录
                         if need_make_video_dir:
                             if not tool.make_dir(video_path, 0):
-                                print_error_msg(account_name + " 创建图片下载目录： " + video_path + " 失败")
+                                print_error_msg(account_name + " 创建图片下载目录 %s 失败" % video_path)
                                 tool.process_exit()
                             need_make_video_dir = False
                         if tool.save_net_file(video_source_url, video_file_path):
-                            print_step_msg(account_name + " 第" + str(video_count) + "个视频下载成功")
+                            print_step_msg(account_name + " 第%s个视频下载成功" % video_count)
                             video_count += 1
                         else:
-                            print_error_msg(account_name + " 第" + str(video_count) + "个视频 " + video_page_url + " 下载失败")
+                            print_error_msg(account_name + " 第%s个视频 %s 下载失败" % (video_count, video_page_url))
 
                     # 达到配置文件中的下载数量，结束
                     if 0 < GET_VIDEO_COUNT < video_count:
@@ -461,16 +461,16 @@ class Download(threading.Thread):
             need_make_image_dir = True
             while IS_DOWNLOAD_IMAGE and (not is_over):
                 # 获取指定一页图片的信息
-                photo_page_data = get_weibo_photo_page_data(account_id, page_count)
+                photo_page_data = get_photo_page_data(account_id, page_count)
                 if photo_page_data is None:
                     print_error_msg(account_name + " 图片列表解析错误")
                     first_image_time = "0"  # 存档恢复
                     break
 
-                trace(account_name + "第：" + str(page_count) + "页的全部图片信息：" + str(photo_page_data))
+                trace(account_name + "第%s页的全部图片信息：%s" % (page_count, photo_page_data))
                 for image_info in photo_page_data["photo_list"]:
                     if not robot.check_sub_key(("pic_host", "pic_name", "timestamp"), image_info):
-                        print_error_msg(account_name + " 第" + str(image_count) + "张图片信息解析错误 " + image_info)
+                        print_error_msg(account_name + " 第%s张图片信息解析错误 %s" % (image_count, image_info))
                         continue
 
                     # 新增图片导致的重复判断
@@ -487,30 +487,30 @@ class Download(threading.Thread):
                         break
 
                     # 下载
-                    image_url = str(image_info["pic_host"]) + "/large/" + str(image_info["pic_name"])
-                    print_step_msg(account_name + " 开始下载第" + str(image_count) + "张图片：" + image_url)
+                    image_url = "%s/large/%s" % (image_info["pic_host"], image_info["pic_name"])
+                    print_step_msg(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
                     # 获取图片的二进制数据，并且判断这个图片是否是可用的
                     image_status, image_byte = get_image_byte(image_url)
                     if image_status != 1:
                         if image_status == -1:
-                            print_error_msg(account_name + " 第" + str(image_count) + "张图片 " + image_url + " 下载失败")
+                            print_error_msg(account_name + " 第%s张图片 %s 下载失败" % (image_count, image_url))
                         elif image_status == -2:
-                            print_error_msg(account_name + " 第" + str(image_count) + "张图片 " + image_url + " 资源已被删除")
+                            print_error_msg(account_name + " 第%s张图片 %s 资源已被删除，跳过" % (image_count, image_url))
                         continue
 
                     # 第一张图片，创建目录
                     if need_make_image_dir:
                         if not tool.make_dir(image_path, 0):
-                            print_error_msg(account_name + " 创建图片下载目录： " + image_path + " 失败")
+                            print_error_msg(account_name + " 创建图片下载目录 %s 失败" % image_path)
                             tool.process_exit()
                         need_make_image_dir = False
 
                     file_type = image_url.split(".")[-1]
                     if file_type.find("/") != -1:
                         file_type = "jpg"
-                    image_file_path = os.path.join(image_path, str("%04d" % image_count) + "." + file_type)
+                    image_file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
                     save_image(image_byte, image_file_path)
-                    print_step_msg(account_name + " 第" + str(image_count) + "张图片下载成功")
+                    print_step_msg(account_name + " 第%s张图片下载成功" % image_count)
                     image_count += 1
 
                     # 达到配置文件中的下载数量，结束
@@ -526,7 +526,7 @@ class Download(threading.Thread):
                         # 全部图片下载完毕
                         is_over = True
 
-            print_step_msg(account_name + " 下载完毕，总共获得" + str(image_count - 1) + "张图片和" + str(video_count - 1) + "个视频")
+            print_step_msg(account_name + " 下载完毕，总共获得%s张图片和%s个视频" % (image_count - 1, video_count - 1))
 
             # 排序
             if IS_SORT:
@@ -535,14 +535,14 @@ class Download(threading.Thread):
                     if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
                         print_step_msg(account_name + " 图片从下载目录移动到保存目录成功")
                     else:
-                        print_error_msg(account_name + " 创建图片保存目录： " + destination_path + " 失败")
+                        print_error_msg(account_name + " 创建图片保存目录 %s 失败" % destination_path)
                         tool.process_exit()
                 if video_count > 1:
                     destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
                     if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
                         print_step_msg(account_name + " 视频从下载目录移动到保存目录成功")
                     else:
-                        print_error_msg(account_name + " 创建视频保存目录： " + destination_path + " 失败")
+                        print_error_msg(account_name + " 创建视频保存目录 %s 失败" % destination_path)
                         tool.process_exit()
 
             # 新的存档记录
