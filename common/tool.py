@@ -105,11 +105,16 @@ def http_request(url, post_data=None, cookie=None):
         except Exception, e:
             # 代理无法访问
             if str(e).find("[Errno 10061]") != -1:
-                input_str = raw_input("无法访问代理服务器，请检查代理设置。是否需要继续程序？(Y)es or (N)o：").lower()
-                if input_str in ["y", "yes"]:
-                    pass
-                elif input_str in ["n", "no"]:
-                    sys.exit()
+                # 判断是否设置了代理
+                if urllib2._opener.handlers is not None:
+                    for handler in urllib2._opener.handlers:
+                        if isinstance(handler, urllib2.ProxyHandler):
+                            input_str = raw_input("无法访问代理服务器，请检查代理设置。是否需要继续程序？(Y)es or (N)o：").lower()
+                            if input_str in ["y", "yes"]:
+                                pass
+                            elif input_str in ["n", "no"]:
+                                sys.exit()
+                            break
             # 连接被关闭，等待1分钟后再尝试
             elif str(e).find("[Errno 10053] ") != -1:
                 print_msg("访问页面超时，重新连接请稍后")
@@ -304,8 +309,9 @@ def _filter_domain(domain, target_domains):
 
 
 # 设置代理
-def set_proxy(ip, port, protocol):
-    proxy_handler = urllib2.ProxyHandler({protocol: "http://" + ip + ":" + port})
+def set_proxy(ip, port):
+    proxy_address = "http://%s:%s" % (ip, port)
+    proxy_handler = urllib2.ProxyHandler({"http": proxy_address, "https": proxy_address})
     opener = urllib2.build_opener(proxy_handler)
     urllib2.install_opener(opener)
     print_msg("设置代理成功")
@@ -327,13 +333,10 @@ def quickly_set(is_set_cookie, proxy_type):
         else:
             cookie_path = robot.get_config(config, "COOKIE_PATH", "", 0)
         set_cookie(cookie_path, browser_type)
-    if proxy_type > 0:
+    if proxy_type == 1:
         proxy_ip = robot.get_config(config, "PROXY_IP", "127.0.0.1", 0)
         proxy_port = robot.get_config(config, "PROXY_PORT", "8087", 0)
-        if proxy_type == 1:
-            set_proxy(proxy_ip, proxy_port, "http")
-        elif proxy_type == 2:
-            set_proxy(proxy_ip, proxy_port, "https")
+        set_proxy(proxy_ip, proxy_port)
 
 
 # 控制台输出
