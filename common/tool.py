@@ -212,10 +212,7 @@ def create_cookie(name, value, domain="", path="/"):
 def set_cookie(file_path, browser_type=1, target_domains=""):
     # 有些DB文件开启了WAL功能（SQL3.7引入，Python2.7的sqlite3的版本是3.6，所以需要pysqlite2.8）
     # import sqlite3
-    if sys.version.find("32 bit") != -1:
-        from pysqlite2_win32 import dbapi2 as sqlite
-    else:
-        from pysqlite2_win64 import dbapi2 as sqlite
+    from pysqlite2 import dbapi2 as sqlite
     if not os.path.exists(file_path):
         print_msg("cookie目录：" + file_path + " 不存在")
         return False
@@ -326,7 +323,7 @@ def set_proxy(ip, port):
 # proxy_type        0:不设置, 1:http, 2:https
 def quickly_set(is_set_cookie, proxy_type):
     import robot
-    config = robot.read_config()
+    config = robot.read_config(os.path.join(os.getcwd(), "..\\common\\config.ini"))
     if is_set_cookie == 1:
         # 操作系统&浏览器
         browser_type = robot.get_config(config, "BROWSER_VERSION", 2, 1)
@@ -356,6 +353,12 @@ def print_msg(msg, is_time=True):
 # 获取时间
 def get_time():
     return time.strftime("%m-%d %H:%M:%S", time.localtime(time.time()))
+
+
+# http请求返回的时间字符串转换为时间戳
+def response_time_to_timestamp(time_string):
+    last_modified_time = time.strptime(time_string, "%a, %d %b %Y %H:%M:%S %Z")
+    return int(time.mktime(last_modified_time)) - time.timezone
 
 
 # 根据开始与结束的字符串，截取字符串
