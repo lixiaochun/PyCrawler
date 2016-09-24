@@ -108,6 +108,7 @@ def save_image(image_byte, image_path):
 
 # 将多个ts文件的地址保存为本地视频文件
 def save_video(ts_file_list, file_path):
+    file_path = tool.change_path_encoding(file_path)
     file_handle = open(file_path, "wb")
     for ts_file_url in ts_file_list:
         ts_file_return_code, ts_file_data = tool.http_request(ts_file_url)[:2]
@@ -243,8 +244,8 @@ class Download(threading.Thread):
         global TOTAL_VIDEO_COUNT
 
         account_id = self.account_info[0]
-        if len(self.account_info) >= 3 and self.account_info[2]:
-            account_name = self.account_info[2]
+        if len(self.account_info) >= 6 and self.account_info[5]:
+            account_name = self.account_info[5]
         else:
             account_name = self.account_info[0]
 
