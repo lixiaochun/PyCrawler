@@ -1,5 +1,6 @@
 http://yomogi.2ch.net/test/read.cgi/uraidol/1455340494/l50
-
+iwata-karen				岩田華怜
+anai-chihiro				穴井千尋
 阿部マリア　http://7gogo.jp/users/WWvG9KLOUdhe　
 入山杏奈　http://7gogo.jp/users/85vEJg0VrpB9
 
@@ -9,7 +10,6 @@ matsuoka-natsumi				松岡菜摘
 tashima-meru				田島芽瑠
 akimoto-manatsu				秋元真夏(Nogizaka46)
 akimoto-yasushi				秋元康
-anai-chihiro				穴井千尋
 aramaki-misaki				荒巻美咲
 azuma-rion				東李苑
 fuchigami-mai				渕上舞
@@ -44,6 +44,8 @@ miyamae-ami				宮前杏実
 miyazawa-sae				宮澤佐江
 gekkan-akb-shinbun				Monthly AKB48 group News
 nishino-nanase				西野七瀬(Nogizaka46)
+
+
 ogasawara-mayu				小笠原茉由
 okada-kanna				岡田栞奈
 okada-nana				岡田奈々
