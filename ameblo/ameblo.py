@@ -1,7 +1,7 @@
 # -*- coding:UTF-8  -*-
 """
-欅坂46公式Blog图片爬虫
-http://www.keyakizaka46.com/mob/news/diarShw.php?cd=member
+ameblo图片爬虫
+http://ameblo.jp/
 @author: hikaru
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
@@ -45,19 +45,39 @@ def trace(msg):
     threadLock.release()
 
 
-# 获取一页的日志列表
-def get_diary_page_data(account_id, page_count):
-    diary_page_url = "http://www.keyakizaka46.com/mob/news/diarKiji.php"
-    diary_page_url += "?cd=member&ct=%02d&page=%s&rw=%s" % (int(account_id), page_count - 1, IMAGE_COUNT_PER_PAGE)
-    diary_return_code, diary_page = tool.http_request(diary_page_url)[:2]
-    if diary_return_code == 1:
-        diary_data = tool.find_sub_string(diary_page, '<div class="box-main">', '<div class="box-sideMember">')
-        if diary_data:
-            return re.findall("<article>([\s|\S]*?)</article>", diary_page)
+# 获取指定页数的日志页面
+def get_blog_page_data(account_name, page_count):
+    blog_url = "http://ameblo.jp/%s/page-%s.html" % (account_name, page_count)
+    blog_return_code, blog_page, info = tool.http_request(blog_url)
+    if blog_return_code == 1:
+        return blog_page
     return None
 
 
-class Diary(robot.Robot):
+# 解析日志发布时间
+def get_blog_time(blog_page):
+    blog_time_info = tool.find_sub_string(blog_page, '<span class="articleTime">', "</span>")
+    if blog_time_info:
+        blog_time_string = tool.find_sub_string(blog_page, 'pubdate="pubdate">', "</time>").strip()
+        blog_timestamp = time.strptime(blog_time_string, "%Y-%m-%d %H:%M:%S")
+        # 显示时间对应的时间戳，服务器的时区（日本），不对本地时间做转换
+        return int(time.mktime(blog_timestamp))
+    return None
+
+
+# 从日志列表中获取全部的图片，并过滤掉表情
+def get_blog_image_list(blog_page):
+    blog_page = tool.find_sub_string(blog_page, '<div class="articleText">', "<!--entryBottom-->", 1)
+    image_list_find = re.findall('<img [\S|\s]*?src="([^"]*)" [\S|\s]*?>', blog_page)
+    image_list = []
+    for image_url in image_list_find:
+        # 过滤表情
+        if image_url.find(".ameba.jp/blog/ucs/") == -1:
+            image_list.append(image_url)
+    return image_list
+
+
+class Ameblo(robot.Robot):
     def __init__(self):
         global GET_IMAGE_COUNT
         global IMAGE_TEMP_PATH
@@ -99,7 +119,7 @@ class Diary(robot.Robot):
         # 寻找idlist，如果没有结束进程
         account_list = {}
         if os.path.exists(self.save_data_path):
-            # account_id  image_count  last_diary_time
+            # account_name  image_count  last_diary_time
             account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0"])
             ACCOUNTS = account_list.keys()
         else:
@@ -117,7 +137,7 @@ class Diary(robot.Robot):
 
         # 循环下载每个id
         main_thread_count = threading.activeCount()
-        for account_id in sorted(account_list.keys()):
+        for account_name in sorted(account_list.keys()):
             # 检查正在运行的线程数
             while threading.activeCount() >= self.thread_count + main_thread_count:
                 if tool.is_process_end() == 0:
@@ -130,7 +150,7 @@ class Diary(robot.Robot):
                 break
 
             # 开始下载
-            thread = Download(account_list[account_id])
+            thread = Download(account_list[account_name])
             thread.start()
 
             time.sleep(1)
@@ -142,9 +162,9 @@ class Diary(robot.Robot):
         # 未完成的数据保存
         if len(ACCOUNTS) > 0:
             new_save_data_file = open(NEW_SAVE_DATA_PATH, "a")
-            for account_id in ACCOUNTS:
-                # account_id  image_count  last_diary_id
-                new_save_data_file.write("\t".join(account_list[account_id]) + "\n")
+            for account_name in ACCOUNTS:
+                # account_name  image_count  last_blog_time
+                new_save_data_file.write("\t".join(account_list[account_name]) + "\n")
             new_save_data_file.close()
 
         # 删除临时文件夹
@@ -168,11 +188,7 @@ class Download(threading.Thread):
     def run(self):
         global TOTAL_IMAGE_COUNT
 
-        account_id = self.account_info[0]
-        if len(self.account_info) >= 4 and self.account_info[3]:
-            account_name = self.account_info[3]
-        else:
-            account_name = self.account_info[0]
+        account_name = self.account_info[0]
 
         try:
             print_step_msg(account_name + " 开始")
@@ -185,65 +201,53 @@ class Download(threading.Thread):
 
             image_count = 1
             page_count = 1
-            first_diary_id = "0"
+            first_blog_time = "0"
             is_over = False
             need_make_image_dir = True
             while not is_over:
-                # 获取指定时间点后的一页图片信息
-                diary_list = get_diary_page_data(account_id, page_count)
-                if diary_list is None:
-                    print_error_msg(account_name + " 第%s页日志列表解析异常" % page_count)
+                blog_data = get_blog_page_data(account_name, page_count)
+                if blog_data is None:
+                    print_error_msg(account_name + " 第%s页日志无法获取" % page_count)
                     tool.process_exit()
 
-                # 没有获取到任何日志，所有日志已经全部获取完毕了
-                if len(diary_list) == 0:
+                blog_time = get_blog_time(blog_data)
+                if blog_time is None:
+                    print_error_msg(account_name + " 第%s页日志无法解析日志时间" % page_count)
+                    tool.process_exit()
+
+                # 检查是否是上一次的最后blog
+                if int(blog_time) <= int(self.account_info[2]):
                     break
 
-                for diary_info in diary_list:
-                    diary_id = tool.find_sub_string(diary_info, "id=", "&")
-                    # 检查是否是上一次的最后视频
-                    if int(diary_id) <= int(self.account_info[2]):
-                        is_over = True
-                        break
+                # 将第一个日志的时间做为新的存档记录
+                if first_blog_time == "0":
+                    first_blog_time = blog_time
 
-                    # 将第一个日志的id做为新的存档记录
-                    if first_diary_id == "0":
-                        first_diary_id = diary_id
-
-                    trace(account_name + " 日志id %s" % diary_id)
-
-                    diary_info = tool.find_sub_string(diary_info, '<div class="box-article">', '<div class="box-bottom">')
-                    # 日志中所有的图片
-                    image_list = re.findall('<img src="([^"]*)"', diary_info)
-                    for image_url in image_list:
-                        # 如果图片地址没有域名，表示直接使用当前域名下的资源，需要拼接成完整的地址
-                        if image_url[:7] != "http://" and image_url[:8] != "https://":
-                            if image_url[0] == "/":
-                                image_url = "http://www.keyakizaka46.com%s" % image_url
-                            else:
-                                image_url = "http://www.keyakizaka46.com/%s" % image_url
-
-                        print_step_msg(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
+                image_list = get_blog_image_list(blog_data)
+                for image_url in image_list:
+                    # 使用默认图片的分辨率
+                    image_url = image_url.split("?")[0]
+                    print_step_msg(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
                         
-                        # 第一张图片，创建目录
-                        if need_make_image_dir:
-                            if not tool.make_dir(image_path, 0):
-                                print_error_msg(account_name + " 创建图片下载目录 %s 失败" % image_path)
-                                tool.process_exit()
-                            need_make_image_dir = False
+                    # 第一张图片，创建目录
+                    if need_make_image_dir:
+                        if not tool.make_dir(image_path, 0):
+                            print_error_msg(account_name + " 创建图片下载目录 %s 失败" % image_path)
+                            tool.process_exit()
+                        need_make_image_dir = False
 
-                        file_type = image_url.split(".")[-1]
-                        file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
-                        if tool.save_net_file(image_url, file_path):
-                            print_step_msg(account_name + " 第%s张图片下载成功" % image_count)
-                            image_count += 1
-                        else:
-                            print_error_msg(account_name + " 第%s张图片 %s 获取失败" % (image_count, image_url))
+                    file_type = image_url.split(".")[-1]
+                    file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
 
-                    # 达到配置文件中的下载数量，结束
-                    if 0 < GET_IMAGE_COUNT < image_count:
-                        is_over = True
-                        break
+                    if tool.save_net_file(image_url, file_path):
+                        print_step_msg(account_name + " 第%s张图片下载成功" % image_count)
+                        image_count += 1
+                    else:
+                        print_error_msg(account_name + " 第%s张图片 %s 获取失败" % (image_count, image_url))
+
+                # 达到配置文件中的下载数量，结束
+                if 0 < GET_IMAGE_COUNT < image_count:
+                    is_over = True
 
                 if not is_over:
                     page_count += 1
@@ -260,15 +264,15 @@ class Download(threading.Thread):
                     tool.process_exit()
 
             # 新的存档记录
-            if first_diary_id != "0":
+            if first_blog_time != "0":
                 self.account_info[1] = str(int(self.account_info[1]) + image_count - 1)
-                self.account_info[2] = first_diary_id
+                self.account_info[2] = first_blog_time
 
             # 保存最后的信息
             threadLock.acquire()
             tool.write_file("\t".join(self.account_info), NEW_SAVE_DATA_PATH)
             TOTAL_IMAGE_COUNT += image_count - 1
-            ACCOUNTS.remove(account_id)
+            ACCOUNTS.remove(account_name)
             threadLock.release()
 
             print_step_msg(account_name + " 完成")
@@ -283,4 +287,4 @@ class Download(threading.Thread):
 
 
 if __name__ == "__main__":
-    Diary().main()
+    Ameblo().main()
