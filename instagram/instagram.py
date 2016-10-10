@@ -52,7 +52,6 @@ def trace(msg):
 
 # 根据账号名字获得账号id（字母账号->数字账号)
 def get_account_id(account_name):
-    # index_url = "https://www.instagram.com/" + account_name
     search_url = "https://www.instagram.com/web/search/topsearch/?context=blended&rank_token=1&query=%s" % account_name
     for i in range(0, 10):
         search_return_code, search_data = tool.http_request(search_url)[:2]
@@ -76,7 +75,7 @@ def get_follow_by_list(account_id):
     cursor = None
     follow_by_list = []
     while True:
-        follow_by_page_data = get_follow_by_list_page_data(account_id, cursor)
+        follow_by_page_data = get_one_page_follow_by_list(account_id, cursor)
         if follow_by_page_data is not None:
             for node in follow_by_page_data["nodes"]:
                 if robot.check_sub_key(("username", ), node):
@@ -91,7 +90,7 @@ def get_follow_by_list(account_id):
 
 
 # 获取指定一页的粉丝列表
-def get_follow_by_list_page_data(account_id, cursor=None):
+def get_one_page_follow_by_list(account_id, cursor=None):
     follow_by_list_url = "https://www.instagram.com/query/"
     # node支持的字段：id,is_verified,followed_by_viewer,requested_by_viewer,full_name,profile_pic_url,username
     if cursor is None:
@@ -117,7 +116,7 @@ def get_follow_list(account_id):
     cursor = None
     follow_list = []
     while True:
-        follow_page_data = get_follow_list_page_data(account_id, cursor)
+        follow_page_data = get_one_page_follow_list(account_id, cursor)
         if follow_page_data is not None:
             for node in follow_page_data["nodes"]:
                 if robot.check_sub_key(("username", ), node):
@@ -132,7 +131,7 @@ def get_follow_list(account_id):
 
 
 # 获取指定一页的关注列表
-def get_follow_list_page_data(account_id, cursor=None):
+def get_one_page_follow_list(account_id, cursor=None):
     follow_list_url = "https://www.instagram.com/query/"
     # node支持的字段：id,is_verified,followed_by_viewer,requested_by_viewer,full_name,profile_pic_url,username
     if cursor is None:
@@ -154,7 +153,9 @@ def get_follow_list_page_data(account_id, cursor=None):
 
 
 # 获取一页的媒体信息
-def get_media_page_data(account_id, cursor):
+# account_id -> 490060609
+def get_one_page_media_data(account_id, cursor):
+    # https://www.instagram.com/query/?q=ig_user(490060609){media.after(9999999999999999999,12){nodes{code,date,display_src,is_video},page_info}}
     media_page_url = "https://www.instagram.com/query/"
     # node支持的字段：caption,code,comments{count},date,dimensions{height,width},display_src,id,is_video,likes{count},owner{id},thumbnail_src,video_views
     media_page_url += "?q=ig_user(%s){media.after(%s,%s){nodes{code,date,display_src,is_video},page_info}}" % (account_id, cursor, IMAGE_COUNT_PER_PAGE)
@@ -169,6 +170,16 @@ def get_media_page_data(account_id, cursor):
                 if robot.check_sub_key(("page_info", "nodes"), media_page["media"]):
                     if robot.check_sub_key(("has_next_page", "end_cursor", ), media_page["media"]["page_info"]):
                         return media_page["media"]
+    return None
+
+
+# 根据日志ID，获取视频下载地址
+# post_id -> BKdvRtJBGou
+def get_video_url(post_id):
+    post_page_url = "https://www.instagram.com/p/%s/" % post_id
+    post_page_return_code, post_page = tool.http_request(post_page_url)[:2]
+    if post_page_return_code == 1:
+        return tool.find_sub_string(post_page, '<meta property="og:video:secure_url" content="', '" />')
     return None
 
 
@@ -322,12 +333,12 @@ class Download(threading.Thread):
             need_make_video_dir = True
             while not is_over:
                 # 获取指定时间后的一页媒体信息
-                media_page_data = get_media_page_data(account_id, cursor)
-                if media_page_data is None:
+                media_data = get_one_page_media_data(account_id, cursor)
+                if media_data is None:
                     print_error_msg(account_name + " 媒体列表解析异常")
                     tool.process_exit()
 
-                nodes_data = media_page_data["nodes"]
+                nodes_data = media_data["nodes"]
                 for photo_info in nodes_data:
                     if not robot.check_sub_key(("is_video", "display_src", "date"), photo_info):
                         print_error_msg(account_name + " 媒体信息解析异常")
@@ -350,14 +361,14 @@ class Download(threading.Thread):
                         image_url = str(photo_info["display_src"].split("?")[0])
                         print_step_msg(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
 
-                        file_type = image_url.split(".")[-1]
-                        image_file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
                         # 第一张图片，创建目录
                         if need_make_image_dir:
                             if not tool.make_dir(image_path, 0):
                                 print_error_msg(account_name + " 创建图片下载目录 %s 失败" % image_path)
                                 tool.process_exit()
                             need_make_image_dir = False
+                        file_type = image_url.split(".")[-1]
+                        image_file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
                         if tool.save_net_file(image_url, image_file_path):
                             print_step_msg(account_name + " 第%s张图片下载成功" % image_count)
                             image_count += 1
@@ -366,30 +377,30 @@ class Download(threading.Thread):
 
                     # 视频
                     if IS_DOWNLOAD_VIDEO and photo_info["is_video"]:
-                        post_page_url = "https://www.instagram.com/p/%s/" % photo_info["code"]
-                        post_page_return_code, post_page_response = tool.http_request(post_page_url)[:2]
-                        if post_page_return_code == 1:
-                            video_url = tool.find_sub_string(post_page_response, '<meta property="og:video:secure_url" content="', '" />')
-                            if video_url:
-                                print_step_msg(account_name + " 开始下载第%s个视频 %s" % (video_count, video_url))
+                        # 根据日志ID获取视频下载地址
+                        video_url = get_video_url(photo_info["code"])
+                        if video_url is None:
+                            print_error_msg(account_name + " 第%s个视频code：%s 无法访问" % (video_count, photo_info["code"]))
+                            continue
+                        if not video_url:
+                            print_error_msg(account_name + " 第%s个视频code：%s 没有获取到下载地址" % (video_count, photo_info["code"]))
+                            continue
 
-                                file_type = video_url.split(".")[-1]
-                                video_file_path = os.path.join(video_path, "%04d.%s" % (video_count, file_type))
-                                # 第一个视频，创建目录
-                                if need_make_video_dir:
-                                    if not tool.make_dir(video_path, 0):
-                                        print_error_msg(account_name + " 创建视频下载目录 %s 失败" % video_path)
-                                        tool.process_exit()
-                                    need_make_video_dir = False
-                                if tool.save_net_file(video_url, video_file_path):
-                                    print_step_msg(account_name + " 第%s个视频下载成功" % video_count)
-                                    video_count += 1
-                                else:
-                                    print_error_msg(account_name + " 第%s个视频 %s 下载失败" % (video_count, video_url))
-                            else:
-                                print_error_msg(account_name + " 第%s个视频 视频页 %s 没有获取到源地址" % (video_count, post_page_url))
+                        print_step_msg(account_name + " 开始下载第%s个视频 %s" % (video_count, video_url))
+
+                        # 第一个视频，创建目录
+                        if need_make_video_dir:
+                            if not tool.make_dir(video_path, 0):
+                                print_error_msg(account_name + " 创建视频下载目录 %s 失败" % video_path)
+                                tool.process_exit()
+                            need_make_video_dir = False
+                        file_type = video_url.split(".")[-1]
+                        video_file_path = os.path.join(video_path, "%04d.%s" % (video_count, file_type))
+                        if tool.save_net_file(video_url, video_file_path):
+                            print_step_msg(account_name + " 第%s个视频下载成功" % video_count)
+                            video_count += 1
                         else:
-                            print_error_msg(account_name + " 第%s个视频 无法访问信息页 %s" % (video_count, post_page_url))
+                            print_error_msg(account_name + " 第%s个视频 %s 下载失败" % (video_count, video_url))
 
                     # 达到配置文件中的下载数量，结束
                     if 0 < GET_IMAGE_COUNT < image_count:
@@ -397,8 +408,8 @@ class Download(threading.Thread):
                         break
 
                 if not is_over:
-                    if media_page_data["page_info"]["has_next_page"]:
-                        cursor = str(media_page_data["page_info"]["end_cursor"])
+                    if media_data["page_info"]["has_next_page"]:
+                        cursor = str(media_data["page_info"]["end_cursor"])
                     else:
                         is_over = True
 

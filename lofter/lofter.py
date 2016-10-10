@@ -45,6 +45,21 @@ def trace(msg):
     threadLock.release()
 
 
+# 获取指定一页的全部日志地址列表
+def get_one_page_post_url_list(account_id, page_count):
+    # http://moexia.lofter.com/?page=1
+    index_page_url = "http://%s.lofter.com/?page=%s" % (account_id, page_count)
+    index_page_return_code, index_page = tool.http_request(index_page_url)[:2]
+    if index_page_return_code == 1:
+        return re.findall('"(http://' + account_id + '.lofter.com/post/[^"]*)"', index_page)
+    return None
+
+
+# 从日志页获取全部图片地址列表
+def get_image_url_list(post_page):
+    return re.findall('bigimgsrc="([^"]*)"', post_page)
+
+
 class Lofter(robot.Robot):
     def __init__(self):
         global GET_PAGE_COUNT
@@ -157,8 +172,6 @@ class Download(threading.Thread):
         try:
             print_step_msg(account_id + " 开始")
 
-            host_url = "%s.lofter.com" % account_id
-
             # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
             if IS_SORT:
                 image_path = os.path.join(IMAGE_TEMP_PATH, account_id)
@@ -173,24 +186,21 @@ class Download(threading.Thread):
             is_over = False
             need_make_download_dir = True
             while not is_over:
-                index_page_url = "http://%s/?page=%s" % (host_url, page_count)
-                index_page_return_code, index_page_response = tool.http_request(index_page_url)[:2]
+                post_url_list = get_one_page_post_url_list(account_id, page_count)
                 # 无法获取信息首页
-                if index_page_return_code != 1:
-                    print_error_msg(account_id + " 无法访问相册信息页 %s" % index_page_url)
+                if post_url_list is None:
+                    print_error_msg(account_id + " 无法访问第%s页相册页" % page_count)
                     tool.process_exit()
 
-                # 相册页中全部的信息页
-                post_page_url_list = re.findall('"(http://' + host_url + '/post/[^"]*)"', index_page_response)
-                if len(post_page_url_list) == 0:
+                if len(post_url_list) == 0:
                     # 下载完毕了
                     break
 
                 # 去重排序
-                trace(account_id + " 相册第%s页获取的所有信息页：%s" % (page_count, post_page_url_list))
-                post_page_url_list = sorted(list(set(post_page_url_list)), reverse=True)
-                trace(account_id + " 相册第%s页去重排序后的信息页：%s" % (page_count, post_page_url_list))
-                for post_url in post_page_url_list:
+                trace(account_id + " 相册第%s页获取的所有信息页：%s" % (page_count, post_url_list))
+                post_url_list = sorted(list(set(post_url_list)), reverse=True)
+                trace(account_id + " 相册第%s页去重排序后的信息页：%s" % (page_count, post_url_list))
+                for post_url in post_url_list:
                     post_id = post_url.split("/")[-1].split("_")[-1]
 
                     # 检查是否已下载到前一次的图片
@@ -207,29 +217,29 @@ class Download(threading.Thread):
                     if first_post_id == "":
                         first_post_id = post_id
 
-                    post_page_return_code, post_page_response = tool.http_request(post_url)[:2]
+                    post_page_return_code, post_page = tool.http_request(post_url)[:2]
                     if post_page_return_code != 1:
                         print_error_msg(account_id + " 第%s张图片，无法获取信息页 %s" % (image_count, post_url))
                         continue
 
-                    post_page_image_list = re.findall('bigimgsrc="([^"]*)"', post_page_response)
-                    trace(account_id + " 信息页 %s 获取的所有图片：%s" % (post_url, post_page_image_list))
-                    if len(post_page_image_list) == 0:
+                    image_url_list = get_image_url_list(post_page)
+                    trace(account_id + " 信息页 %s 获取的所有图片：%s" % (post_url, image_url_list))
+                    if len(image_url_list) == 0:
                         print_error_msg(account_id + " 第%s张图片，信息页 %s 中没有找到图片" % (image_count, post_url))
                         continue
-                    for image_url in post_page_image_list:
+                    for image_url in image_url_list:
                         if image_url.rfind("?") > image_url.rfind("."):
-                            image_url = image_url.split("?", 2)[0]
+                            image_url = image_url.split("?")[0]
                         print_step_msg(account_id + " 开始下载第%s张图片 %s" % (image_count, image_url))
 
-                        file_type = image_url.split(".")[-1]
-                        file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
                         # 第一张图片，创建目录
                         if need_make_download_dir:
                             if not tool.make_dir(image_path, 0):
                                 print_error_msg(account_id + " 创建图片下载目录 %s 失败" % image_path)
                                 tool.process_exit()
                             need_make_download_dir = False
+                        file_type = image_url.split(".")[-1]
+                        file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
                         if tool.save_net_file(image_url, file_path):
                             print_step_msg(account_id + " 第%s张图片下载成功" % image_count)
                             image_count += 1

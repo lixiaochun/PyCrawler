@@ -45,6 +45,40 @@ def trace(msg):
     threadLock.release()
 
 
+# 获取一页相册中图片所在的picasweb地址列表
+def get_one_page_album(account_id, token):
+    index_url = "https://plus.google.com/_/photos/pc/read/"
+    post_data = 'f.req=[["posts",null,null,"synthetic:posts:%s",3,"%s",null],[%s,1,null],"%s",null,null,null,null,null,null,null,2]' % (account_id, account_id, GET_IMAGE_URL_COUNT, token)
+    index_page_return_code, index_page = tool.http_request(index_url, post_data)[:2]
+    if index_page_return_code == 1:
+        return index_page
+    return None
+
+
+# 获取相册页中的所有picasweb地址列表
+def get_picasaweb_url_list(album_page):
+    return re.findall('\[\["(https://picasaweb.google.com/[^"]*)"', album_page)
+
+
+# 获取picasaweb页的album id
+def get_picasaweb_page_album_id(account_id, picasaweb_url):
+    message_page_return_code, message_page = tool.http_request(picasaweb_url)[:2]
+    if message_page_return_code == 1:
+        # 查找picasaweb页的album id
+        album_archive_url = "https://get.google.com/albumarchive/pwa/%s/album/" % account_id
+        return tool.find_sub_string(message_page, 'href="%s' % album_archive_url, '"')
+    return None
+
+
+# 获取album id对应相册存档页的全部图片地址列表
+def get_image_url_list(account_id, album_id):
+    album_archive_url = "https://get.google.com/albumarchive/pwaf/%s/album/%s?source=pwa" % (account_id, album_id)
+    album_archive_page_return_code, album_archive_page = tool.http_request(album_archive_url)[:2]
+    if album_archive_page_return_code == 1:
+        return re.findall('<img src="([^"]*)"', album_archive_page)
+    return None
+
+
 # 重组URL并使用最大分辨率
 # https://lh3.googleusercontent.com/uhGpzweN4P7b8KG042-XfksSgpDW6qKtDSIGo-HV1EhVgwQnh1u0DCWEERdlavj0NEusMwwn8OmJnRw=w165-h220-rw
 # ->
@@ -172,7 +206,6 @@ class Download(threading.Thread):
         try:
             print_step_msg(account_name + " 开始")
 
-            photo_album_url = "https://plus.google.com/_/photos/pc/read/"
             # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
             if IS_SORT:
                 image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
@@ -187,34 +220,30 @@ class Download(threading.Thread):
             is_over = False
             need_make_download_dir = True
             while not is_over:
-                post_data = 'f.req=[["posts",null,null,"synthetic:posts:%s",3,"%s",null],[%s,1,null],"%s",null,null,null,null,null,null,null,2]' % (account_id, account_id, GET_IMAGE_URL_COUNT, key)
-                index_page_return_code, index_page_response = tool.http_request(photo_album_url, post_data)[:2]
-                # 无法获取信息首页
-                if index_page_return_code != 1:
-                    print_error_msg(account_name + " 无法访问相册首页 %s，key：%s" % (photo_album_url, key))
+                # 获取一页相册
+                album_page = get_one_page_album(account_id, key)
+                if album_page is None:
+                    print_error_msg(account_name + " 无法访问相册页，token：%s" % key)
                     tool.process_exit()
 
-                # 相册页中全部的picasaweb页
-                page_picasaweb_url_list = re.findall('\[\["(https://picasaweb.google.com/[^"]*)"', index_page_response)
-                trace(account_name + " 相册获取的所有picasaweb页：%s" % page_picasaweb_url_list)
-                for picasaweb_url in page_picasaweb_url_list:
+                # 获取相册页中的所有picasweb地址列表
+                picasaweb_url_list = get_picasaweb_url_list(album_page)
+
+                trace(account_name + " 相册获取的所有picasaweb页：%s" % picasaweb_url_list)
+                for picasaweb_url in picasaweb_url_list:
                     # 有可能拿到带authkey的，需要去掉
                     # https://picasaweb.google.com/116300481938868290370/2015092603?authkey\u003dGv1sRgCOGLq-jctf-7Ww#6198800191175756402
                     picasaweb_url = picasaweb_url.replace("\u003d", "=")
-                    message_page_return_code, message_page_data = tool.http_request(picasaweb_url)[:2]
-                    if message_page_return_code != 1:
+
+                    # 获取picasaweb页的album id
+                    album_id = get_picasaweb_page_album_id(account_id, picasaweb_url)
+                    if album_id is None:
                         print_error_msg(account_name + " 第%s张图片，无法访问picasaweb页 %s" % (image_count, picasaweb_url))
                         continue
-
-                    # 查找picasaweb页的album id
-                    album_archive_url = "https://get.google.com/albumarchive/pwa/%s/album/" % account_id
-                    album_id = tool.find_sub_string(message_page_data, 'href="%s' % album_archive_url, '"')
-
                     if not album_id:
-                        print_error_msg(account_name + " 第%s张图片，picasaweb页 %s 中没有找到album id" % (image_count, picasaweb_url))
+                        print_error_msg(account_name + " 第%s张图片，picasaweb页 %s 获取album id失败" % (image_count, picasaweb_url))
                         continue
-
-                    print_step_msg(account_name + " picasaweb页 %s 的album id：%s" % (picasaweb_url, album_id))
+                    trace(account_name + " picasaweb页 %s 的album id：%s" % (picasaweb_url, album_id))
 
                     # 检查是否已下载到前一次的图片
                     if int(album_id) <= int(self.account_info[2]):
@@ -230,27 +259,18 @@ class Download(threading.Thread):
                     if first_album_id == "0":
                         first_album_id = album_id
 
-                    # 截取图片信息部分
-                    album_archive_url = "https://get.google.com/albumarchive/pwaf/%s/album/%s?source=pwa" % (account_id, album_id)
-                    album_archive_page_return_code, album_archive_page = tool.http_request(album_archive_url)[:2]
-                    if album_archive_page_return_code != 1:
-                        print_error_msg(account_name + " 第%s张图片，无法访问相册存档页 %s" % (image_count, album_archive_url))
+                    # 获取album id对应相册存档页的全部图片地址列表
+                    image_url_list = get_image_url_list(account_id, album_id)
+                    if image_url_list is None:
+                        print_error_msg(account_name + " 第%s张图片，无法访问album id：%s 的相册存档页" % (image_count, album_id))
+                        continue
+                    if len(image_url_list) == 0:
+                        print_error_msg(account_name + " 第%s张图片，album id：%s 的相册存档页没有解析到图片" % (image_count, album_id))
                         continue
 
-                    # 匹配查找所有的图片
-                    page_image_url_list = re.findall('<img src="([^"]*)"', album_archive_page)
-                    trace(account_name + " 相册页 %s 获取的所有图片：%s" % (album_archive_page, page_image_url_list))
-                    if len(page_image_url_list) == 0:
-                        print_error_msg(account_name + " 第%s张图片，picasaweb页 %s 中没有找到标签'<img src='" % (image_count, picasaweb_url))
-                        continue
-                    for image_url in page_image_url_list:
+                    trace(account_name + " album id：%s 的相册存档页获取的所有图片：%s" % (album_id, image_url_list))
+                    for image_url in image_url_list:
                         image_url = generate_max_resolution_image_url(image_url)
-                        # 文件类型
-                        if image_url.rfind("/") < image_url.rfind("."):
-                            file_type = image_url.split(".")[-1]
-                        else:
-                            file_type = "jpg"
-                        file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
 
                         # 下载
                         print_step_msg(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
@@ -260,6 +280,11 @@ class Download(threading.Thread):
                                 print_error_msg(account_name + " 创建图片下载目录 %s 失败" % image_path)
                                 tool.process_exit()
                             need_make_download_dir = False
+                        if image_url.rfind("/") < image_url.rfind("."):
+                            file_type = image_url.split(".")[-1]
+                        else:
+                            file_type = "jpg"
+                        file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
                         if tool.save_net_file(image_url, file_path):
                             print_step_msg(account_name + " 第%s张图片下载成功" % image_count)
                             image_count += 1
@@ -275,14 +300,14 @@ class Download(threading.Thread):
 
                 if not is_over:
                     # 查找下一页的token key
-                    key_find = re.findall('"([.]?[a-zA-Z0-9-_]*)"', index_page_response)
+                    key_find = re.findall('"([.]?[a-zA-Z0-9-_]*)"', album_page)
                     if len(key_find) > 0 and len(key_find[0]) > 80:
                         key = key_find[0]
                     else:
                         # 不是第一次下载
                         if self.account_info[2] != "":
                             print_error_msg(account_name + " 没有找到下一页的token，将该页保存：")
-                            print_error_msg(index_page_response)
+                            print_error_msg(album_page)
                         is_over = True
 
             print_step_msg(account_name + " 下载完毕，总共获得%s张图片" % (image_count - 1))
