@@ -122,6 +122,69 @@ def unfollow(account_id):
     return False
 
 
+# 检测登录状态
+def check_login():
+    home_page_url = "http://bcy.net/home/user/index"
+    home_page_return = tool.http_request(home_page_url)
+    if home_page_return[0] == 1:
+        real_url = home_page_return[2].geturl()
+        if (home_page_url != real_url) or ("http://bcy.net/start" == real_url):
+            is_check_ok = False
+            while not is_check_ok:
+                input_str = raw_input(tool.get_time() + " 没有检测到您的账号信息，可能无法获取那些只对粉丝开放的隐藏作品，是否下一步操作？ (Y)es or (N)o: ")
+                input_str = input_str.lower()
+                if input_str in ["y", "yes"]:
+                    is_check_ok = True
+                elif input_str in ["n", "no"]:
+                    tool.process_exit()
+
+
+# 获取一页的作品信息
+def get_one_page_post(coser_id, page_count):
+    # http://bcy.net/u/50220/post/cos?&p=1
+    post_url = "http://bcy.net/u/%s/post/cos?&p=%s" % (coser_id, page_count)
+    post_page_return_code, post_page = tool.http_request(post_url)[:2]
+    if post_page_return_code == 1:
+        return post_page
+    return None
+
+
+# 解析作品信息，获取所有的正片信息
+def get_rp_list(post_page):
+    cp_and_rp_id_list = re.findall('/coser/detail/(\d+)/(\d+)"', post_page)
+    title_list = re.findall('<img src="\S*" alt="([\S ]*)" />', post_page)
+    if "${post.title}" in title_list:
+        title_list.remove("${post.title}")
+    cp_id = None
+    rp_list = {}
+    if len(cp_and_rp_id_list) == len(title_list):
+        for cp_id, rp_id in cp_and_rp_id_list:
+            rp_list[rp_id] = title_list.pop(0)
+    return cp_id, rp_list
+
+
+# 获取正片页面内的所有图片地址列表
+# cp_id -> 9299
+# rp_id -> 36484
+def get_image_url_list(cp_id, rp_id):
+    # http://bcy.net/coser/detail/9299/36484
+    rp_url = "http://bcy.net/coser/detail/%s/%s" % (cp_id, rp_id)
+    rp_page_return_code, rp_page_response = tool.http_request(rp_url)[:2]
+    if rp_page_return_code == 1:
+        return re.findall("src='([^']*)'", rp_page_response)
+    return None
+
+
+# 根据当前作品页面，获取作品页数上限
+def get_max_page_count(coser_id, post_page):
+    max_page_count = tool.find_sub_string(post_page, '<a href="/u/%s/post/cos?&p=' % coser_id, '">尾页</a>')
+    if max_page_count:
+        max_page_count = int(max_page_count)
+    else:
+        max_page_count = 1
+    return max_page_count
+
+
 class Bcy(robot.Robot):
     def __init__(self):
         global GET_PAGE_COUNT
@@ -157,19 +220,9 @@ class Bcy(robot.Robot):
             print_error_msg("导入浏览器cookies失败")
             tool.process_exit()
 
-        home_page_url = "http://bcy.net/home/user/index"
-        home_page_return = tool.http_request(home_page_url)
-        if home_page_return[0] == 1:
-            real_url = home_page_return[2].geturl()
-            if (home_page_url != real_url) or ("http://bcy.net/start" == real_url):
-                is_check_ok = False
-                while not is_check_ok:
-                    input_str = raw_input(tool.get_time() + " 没有检测到您的账号信息，可能无法获取那些只对粉丝开放的隐藏作品，是否下一步操作？ (Y)es or (N)o: ")
-                    input_str = input_str.lower()
-                    if input_str in ["y", "yes"]:
-                        is_check_ok = True
-                    elif input_str in ["n", "no"]:
-                        tool.process_exit()
+        # 检测登录状态
+        # 未登录时提示可能无法获取粉丝指定的作品
+        check_login()
 
         # 寻找idlist，如果没有结束进程
         account_list = {}
@@ -240,32 +293,30 @@ class Download(threading.Thread):
         try:
             print_step_msg(cn + " 开始")
 
+            image_path = os.path.join(IMAGE_DOWNLOAD_PATH, cn)
+
             # 图片下载
             this_cn_total_image_count = 0
             page_count = 1
-            max_page_count = -1
             total_rp_count = 1
             first_rp_id = ""
             unique_list = []
             is_over = False
             need_make_download_dir = True  # 是否需要创建cn目录
             while not is_over:
-                post_url = "http://bcy.net/u/%s/post/cos?&p=%s" % (coser_id, page_count)
-                post_page_return_code, post_page_response = tool.http_request(post_url)[:2]
-                if post_page_return_code != 1:
-                    print_error_msg(cn + " 无法访问信息页 %s" % post_url)
+                # 获取一页的作品信息
+                post_page = get_one_page_post(coser_id, page_count)
+                if post_page is None:
+                    print_error_msg(cn + " 无法访问第%s页作品" % page_count)
                     tool.process_exit()
 
-                page_rp_id_list = re.findall('/coser/detail/(\d+)/(\d+)"', post_page_response)
-                page_title_list = re.findall('<img src="\S*" alt="([\S ]*)" />', post_page_response)
-                if "${post.title}" in page_title_list:
-                    page_title_list.remove("${post.title}")
-                if len(page_rp_id_list) != len(page_title_list):
-                    print_error_msg(cn + " 信息页 %s 获取的rp_id和title数量不符" % post_url)
+                # 解析作品信息，获取所有的正片信息
+                cp_id, rp_list = get_rp_list(post_page)
+                if cp_id is None:
+                    print_error_msg(cn + " 第%s页作品解析异常" % page_count)
                     tool.process_exit()
 
-                title_index = 0
-                for cp_id, rp_id in page_rp_id_list:
+                for rp_id, title in rp_list.iteritems():
                     # 检查是否已下载到前一次的图片
                     if int(rp_id) <= int(self.account_info[1]):
                         is_over = True
@@ -282,22 +333,16 @@ class Download(threading.Thread):
 
                     print_step_msg("rp: " + rp_id)
 
-                    # CN目录
-                    image_path = os.path.join(IMAGE_DOWNLOAD_PATH, cn)
-
                     if need_make_download_dir:
                         if not tool.make_dir(image_path, 0):
                             print_error_msg(cn + " 创建CN目录 %s 失败" % image_path)
                             tool.process_exit()
                         need_make_download_dir = False
 
-                    # 作品目录
-                    title = page_title_list[title_index]
-                    # 过滤一些windows文件名屏蔽的字符
+                    # 标题处理
                     for filter_char in ["\\", "/", ":", "*", "?", '"', "<", ">", "|"]:
-                        title = title.replace(filter_char, " ")
-                    # 去除前后空格
-                    title = title.strip()
+                        title = title.replace(filter_char, " ")  # 过滤一些windows文件名屏蔽的字符
+                    title = title.strip()  # 去除前后空格
                     if title:
                         rp_path = os.path.join(image_path, "%s %s" % (rp_id, title))
                     else:
@@ -310,36 +355,33 @@ class Download(threading.Thread):
                             print_error_msg(cn + " 创建作品目录 %s 失败" % rp_path)
                             tool.process_exit()
 
-                    rp_url = "http://bcy.net/coser/detail/%s/%s" % (cp_id, rp_id)
-                    rp_page_return_code, rp_page_response = tool.http_request(rp_url)[:2]
-                    if rp_page_return_code != 1:
-                        print_error_msg(cn + " 无法访问作品页面 %s" % rp_url)
+                    # 获取正片页面内的所有图片地址列表
+                    image_url_list = get_image_url_list(cp_id, rp_id)
+                    if image_url_list is None:
+                        print_error_msg(cn + " 无法访问正片：%s，cp_id：%s" % (rp_id, cp_id))
                         continue
-                    image_url_list = re.findall("src='([^']*)'", rp_page_response)
+
                     if len(image_url_list) == 0 and IS_AUTO_FOLLOW:
                         print_step_msg(cn + " 检测到可能有私密作品且账号不是ta的粉丝，自动关注")
                         if follow(coser_id):
-                            # 重新获取下详细页面
-                            rp_page_return_code, rp_page_response = tool.http_request(rp_url)[:2]
-                            if rp_page_return_code == 1:
-                                image_url_list = re.findall("src='([^']*)'", rp_page_response)
+                            # 重新获取下正片页面内的所有图片地址列表
+                            image_url_list = get_image_url_list(cp_id, rp_id)
 
                     if len(image_url_list) == 0:
-                        print_error_msg(cn + " 作品页面 %s 没有任何图片，可能是你使用的账号没有关注ta，所以无法访问只对粉丝开放的私密作品" % rp_url)
+                        print_error_msg(cn + " 正片：%s没有任何图片，可能是你使用的账号没有关注ta，所以无法访问只对粉丝开放的私密作品，cp_id：%s" % (rp_id, cp_id))
                         continue
 
                     image_count = 1
                     for image_url in image_url_list:
                         # 禁用指定分辨率
                         image_url = "/".join(image_url.split("/")[0:-1])
+                        print_step_msg(cn + " %s 开始下载第%s张图片 %s" % (rp_id, image_count, image_url))
 
                         if image_url.rfind("/") < image_url.rfind("."):
                             file_type = image_url.split(".")[-1]
                         else:
                             file_type = "jpg"
                         file_path = os.path.join(rp_path, "%03d.%s" % (image_count, file_type))
-
-                        print_step_msg(cn + " %s 开始下载第%s张图片 %s" % (rp_id, image_count, image_url))
                         if tool.save_net_file(image_url, file_path):
                             image_count += 1
                             print_step_msg(cn + " %s 第%s张图片下载成功" % (rp_id, image_count))
@@ -352,18 +394,10 @@ class Download(threading.Thread):
                         is_over = True
                         break
                     else:
-                        title_index += 1
                         total_rp_count += 1
 
                 if not is_over:
-                    # 看看总共有几页
-                    if max_page_count == -1:
-                        max_page_count = tool.find_sub_string(post_page_response, '<a href="/u/%s/post/cos?&p=' % coser_id, '">尾页</a>')
-                        if max_page_count:
-                            max_page_count = int(max_page_count)
-                        else:
-                            max_page_count = 1
-                    if page_count >= max_page_count:
+                    if page_count >= get_max_page_count(coser_id, post_page):
                         is_over = True
                     else:
                         page_count += 1

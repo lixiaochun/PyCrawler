@@ -117,6 +117,7 @@ def get_account_page_id(account_id):
 
 
 # 获取一页的视频信息
+# page_id -> 1005052535836307
 def get_one_page_video_data(account_page_id, since_id):
     video_album_url = "http://weibo.com/p/aj/album/loading"
     video_album_url += "?type=video&since_id=%s&page_id=%s&page=1&ajax_call=1" % (since_id, account_page_id)
@@ -185,7 +186,7 @@ def get_video_url(video_play_url):
     # http://v.xiaokaxiu.com/v/0YyG7I4092d~GayCAhwdJQ__.html
     elif video_play_url.find("v.xiaokaxiu.com/v/") >= 0:  # 小咖秀
         video_id = video_play_url.split("/")[-1].split(".")[0]
-        return 1, "http://bsyqncdn.miaopai.com/stream/%s.mp4" % video_id
+        return 1, "http://gslb.miaopai.com/stream/%s.mp4" % video_id
     # http://www.weishi.com/t/2000546051794045
     elif video_play_url.find("www.weishi.com/t/") >= 0:  # 微视
         video_play_page_return_code, video_play_page = tool.http_request(video_play_url)[:2]

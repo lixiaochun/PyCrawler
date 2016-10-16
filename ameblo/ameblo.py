@@ -45,7 +45,7 @@ def trace(msg):
     threadLock.release()
 
 
-# 获取指定页数的日志页面
+# 获取指定页数的日志信息
 def get_blog_page_data(account_name, page_count):
     blog_url = "http://ameblo.jp/%s/page-%s.html" % (account_name, page_count)
     blog_return_code, blog_page, info = tool.http_request(blog_url)
@@ -66,15 +66,15 @@ def get_blog_time(blog_page):
 
 
 # 从日志列表中获取全部的图片，并过滤掉表情
-def get_blog_image_list(blog_page):
+def get_image_url_list(blog_page):
     blog_page = tool.find_sub_string(blog_page, '<div class="articleText">', "<!--entryBottom-->", 1)
-    image_list_find = re.findall('<img [\S|\s]*?src="([^"]*)" [\S|\s]*?>', blog_page)
-    image_list = []
-    for image_url in image_list_find:
+    image_url_list_find = re.findall('<img [\S|\s]*?src="([^"]*)" [\S|\s]*?>', blog_page)
+    image_url_list = []
+    for image_url in image_url_list_find:
         # 过滤表情
         if image_url.find(".ameba.jp/blog/ucs/") == -1:
-            image_list.append(image_url)
-    return image_list
+            image_url_list.append(image_url)
+    return image_url_list
 
 
 class Ameblo(robot.Robot):
@@ -205,11 +205,13 @@ class Download(threading.Thread):
             is_over = False
             need_make_image_dir = True
             while not is_over:
+                # 获取一页日志
                 blog_data = get_blog_page_data(account_name, page_count)
                 if blog_data is None:
                     print_error_msg(account_name + " 第%s页日志无法获取" % page_count)
                     tool.process_exit()
 
+                # 解析日志发布时间
                 blog_time = get_blog_time(blog_data)
                 if blog_time is None:
                     print_error_msg(account_name + " 第%s页日志无法解析日志时间" % page_count)
@@ -223,8 +225,9 @@ class Download(threading.Thread):
                 if first_blog_time == "0":
                     first_blog_time = blog_time
 
-                image_list = get_blog_image_list(blog_data)
-                for image_url in image_list:
+                # 从日志列表中获取全部的图片
+                image_url_list = get_image_url_list(blog_data)
+                for image_url in image_url_list:
                     # 使用默认图片的分辨率
                     image_url = image_url.split("?")[0]
                     print_step_msg(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
@@ -235,10 +238,8 @@ class Download(threading.Thread):
                             print_error_msg(account_name + " 创建图片下载目录 %s 失败" % image_path)
                             tool.process_exit()
                         need_make_image_dir = False
-
                     file_type = image_url.split(".")[-1]
                     file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
-
                     if tool.save_net_file(image_url, file_path):
                         print_step_msg(account_name + " 第%s张图片下载成功" % image_count)
                         image_count += 1
