@@ -34,13 +34,13 @@ PROCESS_CONTROL_PORT = 0
 if not IS_INIT:
     if getattr(sys, "frozen", False):
         IS_EXECUTABLE = True
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    while True:
-        port = random.randint(10000, 65536)
-        print port
-        s.connect((PROCESS_CONTROL_IP, port))
-        s.shutdown(2)
-        PROCESS_CONTROL_PORT = port
+    PROCESS_CONTROL_PORT = random.randint(10000, 65536)
+    # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # while True:
+    #     port = random.randint(10000, 65536)
+    #     s.connect((PROCESS_CONTROL_IP, port))
+    #     s.shutdown(2)
+    #     PROCESS_CONTROL_PORT = port
     IS_INIT = True
 
 
@@ -61,7 +61,6 @@ class ProcessControl(threading.Thread):
     def run(self):
         global PROCESS_STATUS
         listener = Listener((self.ip, self.port))
-        print listener
         while True:
             try:
                 conn = listener.accept()
@@ -341,7 +340,7 @@ def set_proxy(ip, port):
 
 # 快速设置cookie和代理
 # is_set_cookie     0:不设置, 1:设置
-# proxy_type        0:不设置, 1:http, 2:https
+# proxy_type        0:不设置, 1:设置
 def quickly_set(is_set_cookie, proxy_type):
     import robot
     config = robot.read_config(os.path.join(os.getcwd(), "..\\common\\config.ini"))
