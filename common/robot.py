@@ -12,11 +12,40 @@ import sys
 import time
 
 IS_INIT = False
+# 程序是否支持下载图片功能（会判断配置中是否需要下载图片，如全部是则创建图片下载目录）
+SYS_DOWNLOAD_IMAGE = 'download_image'
+# 程序是否支持下载视频功能（会判断配置中是否需要下载视频，如全部是则创建视频下载目录）
+SYS_DOWNLOAD_VIDEO = 'download_video'
+# 程序是否默认需要设置代理
+SYS_SET_PROXY = 'set_proxy'
+# 程序是否支持不需要存档文件就可以开始运行
+SYS_NOT_CHECK_SAVE_DATA = 'no_save_data'
 
 
 class Robot(object):
-    def __init__(self, is_auto_proxy=False, extra_config=None):
+    print_function = None
+
+    # 输出错误日志
+    def print_msg(self, msg):
+        if self.print_function is None:
+            tool.print_msg(msg, True)
+        else:
+            self.print_function(msg)
+
+    # 程序全局变量的设置
+    def __init__(self, sys_config, extra_config=None):
         global IS_INIT
+        self.start_time = time.time()
+
+        # 程序启动配置
+        if not isinstance(sys_config, list):
+            self.print_msg("程序启动配置不存在，请检查代码！")
+            tool.process_exit()
+            return
+        sys_download_image = SYS_DOWNLOAD_IMAGE in sys_config
+        sys_download_video = SYS_DOWNLOAD_VIDEO in sys_config
+        sys_set_proxy = SYS_SET_PROXY in sys_config
+        sys_not_check_save_data = SYS_NOT_CHECK_SAVE_DATA in sys_config
 
         # exe程序
         if tool.IS_EXECUTABLE:
@@ -40,8 +69,9 @@ class Robot(object):
         error_log_dir = os.path.dirname(self.error_log_path)
 
         if not tool.make_dir(error_log_dir, 0):
-            tool.print_msg("创建错误日志目录：" + error_log_dir + " 失败", True)
+            self.print_msg("创建错误日志目录 %s 失败" % error_log_dir)
             tool.process_exit()
+            return
         is_log_step = get_config(config, "IS_LOG_STEP", True, 2)
         if not is_log_step:
             self.step_log_path = ""
@@ -51,8 +81,9 @@ class Robot(object):
             # 日志文件保存目录
             step_log_dir = os.path.dirname(self.step_log_path)
             if not tool.make_dir(step_log_dir, 0):
-                tool.print_msg("创建步骤日志目录：" + step_log_dir + " 失败", True)
+                self.print_msg("创建步骤日志目录 %s 失败" % step_log_dir)
                 tool.process_exit()
+                return
         is_log_trace = get_config(config, "IS_LOG_TRACE", True, 2)
         if not is_log_trace:
             self.trace_log_path = ""
@@ -62,8 +93,9 @@ class Robot(object):
             # 日志文件保存目录
             trace_log_dir = os.path.dirname(self.trace_log_path)
             if not tool.make_dir(trace_log_dir, 0):
-                tool.print_msg("创建调试日志目录：" + trace_log_dir + " 失败", True)
+                self.print_msg("创建调试日志目录 %s 失败" % trace_log_dir)
                 tool.process_exit()
+                return
 
         if not IS_INIT:
             log.IS_SHOW_ERROR = self.is_show_error
@@ -75,40 +107,84 @@ class Robot(object):
             IS_INIT = True
 
         # 是否下载
-        self.is_download_image = get_config(config, "IS_DOWNLOAD_IMAGE", True, 2)
-        self.is_download_video = get_config(config, "IS_DOWNLOAD_VIDEO", True, 2)
+        self.is_download_image = get_config(config, "IS_DOWNLOAD_IMAGE", True, 2) and sys_download_image
+        self.is_download_video = get_config(config, "IS_DOWNLOAD_VIDEO", True, 2) and sys_download_video
+
+        if not self.is_download_image and not self.is_download_video:
+            # 下载图片和视频都没有开启，请检查配置
+            if (not self.is_download_image and sys_download_image) and (not self.is_download_video and sys_download_video):
+                self.print_msg("下载图片和视频都没有开启，请检查配置！")
+            elif not self.is_download_image and sys_download_image:
+                self.print_msg("下载图片没有开启，请检查配置！")
+            elif not self.is_download_video and sys_download_video:
+                self.print_msg("下载视频没有开启，请检查配置！")
+            tool.process_exit()
+            return
 
         # 存档
-        if "image_download_path" in extra_config:
-            self.image_download_path = extra_config["image_download_path"]
-        else:
-            self.image_download_path = get_config(config, "IMAGE_DOWNLOAD_PATH", "photo", 3)
-        if "image_temp_path" in extra_config:
-            self.image_temp_path = extra_config["image_temp_path"]
-        else:
-            self.image_temp_path = get_config(config, "IMAGE_TEMP_PATH", "tempImage", 3)
-        if "video_download_path" in extra_config:
-            self.video_download_path = extra_config["video_download_path"]
-        else:
-            self.video_download_path = get_config(config, "VIDEO_DOWNLOAD_PATH", "video", 3)
-        if "video_temp_path" in extra_config:
-            self.video_temp_path = extra_config["video_temp_path"]
-        else:
-            self.video_temp_path = get_config(config, "VIDEO_TEMP_PATH", "tempVideo", 3)
-
-        self.is_sort = get_config(config, "IS_SORT", True, 2)
-        self.get_image_count = get_config(config, "GET_IMAGE_COUNT", 0, 1)
-        self.get_video_count = get_config(config, "GET_VIDEO_COUNT", 0, 1)
-        self.get_page_count = get_config(config, "GET_PAGE_COUNT", 0, 1)
-
         if "save_data_path" in extra_config:
             self.save_data_path = extra_config["save_data_path"]
         else:
             self.save_data_path = get_config(config, "SAVE_DATA_PATH", "info/save.data", 3)
+        if not sys_not_check_save_data and not os.path.exists(self.save_data_path):
+            # 存档文件不存在
+            self.print_msg("存档文件%s不存在！" % self.save_data_path)
+            tool.process_exit()
+            return
+
+        # 是否需要下载图片
+        if self.is_download_image:
+            # 图片保存目录
+            if "image_download_path" in extra_config:
+                self.image_download_path = extra_config["image_download_path"]
+            else:
+                self.image_download_path = get_config(config, "IMAGE_DOWNLOAD_PATH", "photo", 3)
+            if not tool.make_dir(self.image_download_path, 0):
+                # 图片保存目录创建失败
+                self.print_msg("图片保存目录%s创建失败！" % self.image_download_path)
+                tool.process_exit()
+                return
+            # 图片临时下载目录
+            if "image_temp_path" in extra_config:
+                self.image_temp_path = extra_config["image_temp_path"]
+            else:
+                self.image_temp_path = get_config(config, "IMAGE_TEMP_PATH", "tempImage", 3)
+            # 图片下载数量，0为下载全部可用资源
+            self.get_image_count = get_config(config, "GET_IMAGE_COUNT", 0, 1)
+        else:
+            self.image_download_path = ""
+            self.image_temp_path = ""
+            self.get_image_count = 0
+        # 是否需要下载视频
+        if self.is_download_video:
+            # 视频保存目录
+            if "video_download_path" in extra_config:
+                self.video_download_path = extra_config["video_download_path"]
+            else:
+                self.video_download_path = get_config(config, "VIDEO_DOWNLOAD_PATH", "video", 3)
+            if not tool.make_dir(self.video_download_path, 0):
+                # 视频保存目录创建失败
+                self.print_msg("视频保存目录%s创建失败！" % self.video_download_path)
+                tool.process_exit()
+                return
+            # 视频下载临时目录
+            if "video_temp_path" in extra_config:
+                self.video_temp_path = extra_config["video_temp_path"]
+            else:
+                self.video_temp_path = get_config(config, "VIDEO_TEMP_PATH", "tempVideo", 3)
+            # 视频下载数量，0为下载全部可用资源
+            self.get_video_count = get_config(config, "GET_VIDEO_COUNT", 0, 1)
+        else:
+            self.video_download_path = ""
+            self.video_temp_path = ""
+            self.get_video_count = 0
+        # 是否需要重新排序图片
+        self.is_sort = get_config(config, "IS_SORT", True, 2)
+        self.get_page_count = get_config(config, "GET_PAGE_COUNT", 0, 1)
 
         # 代理
         is_proxy = get_config(config, "IS_PROXY", 2, 1)
-        if is_proxy == 1 or (is_proxy == 2 and is_auto_proxy):
+        if is_proxy == 1 or (is_proxy == 2 and sys_set_proxy):
             proxy_ip = get_config(config, "PROXY_IP", "127.0.0.1", 0)
             proxy_port = get_config(config, "PROXY_PORT", "8087", 0)
             tool.set_proxy(proxy_ip, proxy_port)
@@ -125,6 +201,33 @@ class Robot(object):
 
         # 线程数
         self.thread_count = get_config(config, "THREAD_COUNT", 10, 1)
+
+        # 启用线程监控是否需要暂停其他下载线程
+        process_control_thread = tool.ProcessControl()
+        process_control_thread.setDaemon(True)
+        process_control_thread.start()
+
+        self.print_msg("初始化完成")
+
+    # 获取程序已运行时间（seconds）
+    def get_run_time(self):
+        return time.time() - self.start_time
+
+    # 下载逻辑完成后手动调用，进行一些收尾工作
+    def finish_task(self):
+        if self.image_temp_path:
+            tool.delete_null_dir(self.image_temp_path)
+            if len(tool.get_dir_files_name(self.image_temp_path)) == 0:
+                tool.remove_dir(self.image_temp_path)
+            else:
+                self.print_msg("图片临时下载目录%s中存在文件" % self.image_temp_path)
+        if self.video_temp_path:
+            tool.delete_null_dir(self.video_temp_path)
+            if len(tool.get_dir_files_name(self.video_temp_path)) == 0:
+                tool.remove_dir(self.video_temp_path)
+            else:
+                self.print_msg("视频临时下载目录%s中存在文件" % self.video_temp_path)
+
 
 
 # 读取配置文件
@@ -197,7 +300,7 @@ def read_save_data(save_data_path, key_index, default_value_list):
         save_data_file.close()
         for single_save_data in save_list:
             single_save_data = single_save_data.replace("\xef\xbb\xbf", "").replace("\n", "").replace("\r", "")
-            if len(single_save_data) < 1:
+            if len(single_save_data) == 0:
                 continue
             single_save_list = single_save_data.split("\t")
 
@@ -214,6 +317,15 @@ def read_save_data(save_data_path, key_index, default_value_list):
                 index += 1
             result_list[single_save_list[key_index]] = single_save_list
     return result_list
+
+
+# 将临时存档文件按照主键排序后写入原始存档文件
+# 只支持一行一条记录，每条记录格式相同的存档文件
+def rewrite_save_file(temp_save_data_path, save_data_path):
+    account_list = read_save_data(temp_save_data_path, 0, [])
+    temp_list = [account_list[key] for key in sorted(account_list.keys())]
+    tool.write_file(tool.list_to_string(temp_list), save_data_path, 2)
+    os.remove(temp_save_data_path)
 
 
 # 对存档文件夹按照指定列重新排序

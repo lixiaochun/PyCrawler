@@ -21,8 +21,6 @@ IMAGE_TEMP_PATH = ""
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
 IS_SORT = True
-IS_DOWNLOAD_IMAGE = True
-IS_DOWNLOAD_VIDEO = True
 
 threadLock = threading.Lock()
 
@@ -84,56 +82,26 @@ class Ameblo(robot.Robot):
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
         global IS_SORT
-        global IS_DOWNLOAD_IMAGE
-        global IS_DOWNLOAD_VIDEO
 
-        robot.Robot.__init__(self)
+        sys_config = [
+            robot.SYS_DOWNLOAD_IMAGE,
+        ]
+        robot.Robot.__init__(self, sys_config)
 
         # 设置全局变量，供子线程调用
         GET_IMAGE_COUNT = self.get_image_count
         IMAGE_TEMP_PATH = self.image_temp_path
         IMAGE_DOWNLOAD_PATH = self.image_download_path
         IS_SORT = self.is_sort
-        IS_DOWNLOAD_IMAGE = self.is_download_image
-        IS_DOWNLOAD_VIDEO = self.is_download_video
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
-
-        tool.print_msg("配置文件读取完成")
 
     def main(self):
         global ACCOUNTS
 
-        if not IS_DOWNLOAD_IMAGE and not IS_DOWNLOAD_VIDEO:
-            print_error_msg("下载图片和视频都没有开启，请检查配置！")
-            tool.process_exit()
-
-        start_time = time.time()
-
-        # 创建图片保存目录
-        if IS_DOWNLOAD_IMAGE:
-            print_step_msg("创建图片根目录 %s" % IMAGE_DOWNLOAD_PATH)
-            if not tool.make_dir(IMAGE_DOWNLOAD_PATH, 0):
-                print_error_msg("创建图片根目录 %s 失败" % IMAGE_DOWNLOAD_PATH)
-                tool.process_exit()
-
-        # 寻找idlist，如果没有结束进程
-        account_list = {}
-        if os.path.exists(self.save_data_path):
-            # account_name  image_count  last_diary_time
-            account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0"])
-            ACCOUNTS = account_list.keys()
-        else:
-            print_error_msg("用户ID存档文件 %s 不存在" % self.save_data_path)
-            tool.process_exit()
-
-        # 创建临时存档文件
-        new_save_data_file = open(NEW_SAVE_DATA_PATH, "w")
-        new_save_data_file.close()
-
-        # 启用线程监控是否需要暂停其他下载线程
-        process_control_thread = tool.ProcessControl()
-        process_control_thread.setDaemon(True)
-        process_control_thread.start()
+        # 解析存档文件
+        # account_name  image_count  last_diary_time
+        account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0"])
+        ACCOUNTS = account_list.keys()
 
         # 循环下载每个id
         main_thread_count = threading.activeCount()
@@ -171,13 +139,9 @@ class Ameblo(robot.Robot):
         tool.remove_dir(IMAGE_TEMP_PATH)
 
         # 重新排序保存存档文件
-        account_list = robot.read_save_data(NEW_SAVE_DATA_PATH, 0, [])
-        temp_list = [account_list[key] for key in sorted(account_list.keys())]
-        tool.write_file(tool.list_to_string(temp_list), self.save_data_path, 2)
-        os.remove(NEW_SAVE_DATA_PATH)
+        robot.rewrite_save_file(NEW_SAVE_DATA_PATH, self.save_data_path)
 
-        duration_time = int(time.time() - start_time)
-        print_step_msg("全部下载完毕，耗时%s秒，共计图片%s张" % (duration_time, TOTAL_IMAGE_COUNT))
+        print_step_msg("全部下载完毕，耗时%s秒，共计图片%s张" % (self.get_run_time(), TOTAL_IMAGE_COUNT))
 
 
 class Download(threading.Thread):

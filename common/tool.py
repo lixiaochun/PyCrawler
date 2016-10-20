@@ -22,26 +22,15 @@ import urllib
 import urllib2
 import zipfile
 
-
-IS_INIT = False
-IS_EXECUTABLE = False
+# 初始化操作
 IS_SET_TIMEOUT = False
 PROCESS_STATUS = 0
 PROCESS_CONTROL_IP = "localhost"
-PROCESS_CONTROL_PORT = 0
-
-# 初始化操作
-if not IS_INIT:
-    if getattr(sys, "frozen", False):
-        IS_EXECUTABLE = True
-    PROCESS_CONTROL_PORT = random.randint(10000, 65536)
-    # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # while True:
-    #     port = random.randint(10000, 65536)
-    #     s.connect((PROCESS_CONTROL_IP, port))
-    #     s.shutdown(2)
-    #     PROCESS_CONTROL_PORT = port
-    IS_INIT = True
+PROCESS_CONTROL_PORT = 54321
+if getattr(sys, "frozen", False):
+    IS_EXECUTABLE = True
+else:
+    IS_EXECUTABLE = False
 
 
 # 进程监控
@@ -482,19 +471,24 @@ def get_dir_files_name(path, order=None):
         return files_list
 
 
-# 删除目录下所有文件
-# only_files 是否仅仅删除目录下文件而保留目录
-def remove_dir(dir_path, only_files=False):
+# 删除整个目录以及目录下所有文件
+def remove_dir(dir_path):
     dir_path = change_path_encoding(dir_path)
     if not os.path.exists(dir_path):
         return True
-    if only_files:
+    shutil.rmtree(dir_path, True)
+
+
+# 删除指定目录下的全部空文件夹
+def delete_null_dir(dir_path):
+    if os.path.isdir(dir_path):
         for file_name in os.listdir(dir_path):
-            target_file = os.path.join(dir_path, file_name)
-            if os.path.isfile(target_file):
-                os.remove(target_file)
-    else:
-        shutil.rmtree(dir_path, True)
+            sub_path = os.path.join(dir_path, file_name)
+            if os.path.isdir(sub_path):
+                delete_null_dir(sub_path)
+        if len(os.listdir(dir_path)) == 0:
+            print dir_path
+            os.rmdir(dir_path)
 
 
 # 创建目录

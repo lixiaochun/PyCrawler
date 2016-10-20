@@ -14,21 +14,14 @@ import time
 
 class Shinoda(robot.Robot):
     def __init__(self):
-        super(Shinoda, self).__init__()
-
-        tool.print_msg("配置文件读取完成")
+        sys_config = [
+            robot.SYS_DOWNLOAD_IMAGE,
+            robot.SYS_NOT_CHECK_SAVE_DATA,
+        ]
+        robot.Robot.__init__(self, sys_config)
 
     def main(self):
-        start_time = time.time()
-
-        # 图片下载临时目录
-        if self.is_sort:
-            log.step("创建图片下载目录 %s" % self.image_temp_path)
-            if not tool.make_dir(self.image_temp_path, 0):
-                log.error("创建图片下载目录 %s 失败" % self.image_temp_path)
-                tool.process_exit()
-
-        # 读取存档文件
+        # 解析存档文件
         last_blog_id = ""
         image_start_index = 0
         if os.path.exists(self.save_data_path):
@@ -99,8 +92,7 @@ class Shinoda(robot.Robot):
         new_save_file.write(str(image_start_index) + "\t" + new_last_blog_id)
         new_save_file.close()
 
-        duration_time = int(time.time() - start_time)
-        log.step("全部下载完毕，耗时%s秒，共计图片%s张" % (duration_time, image_count - 1))
+        log.step("全部下载完毕，耗时%s秒，共计图片%s张" % (self.get_run_time(), image_count - 1))
 
 
 if __name__ == "__main__":

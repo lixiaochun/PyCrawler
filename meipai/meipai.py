@@ -95,7 +95,10 @@ class MeiPai(robot.Robot):
         global NEW_SAVE_DATA_PATH
         global IS_SORT
 
-        robot.Robot.__init__(self)
+        sys_config = [
+            robot.SYS_DOWNLOAD_VIDEO,
+        ]
+        robot.Robot.__init__(self, sys_config)
 
         # 设置全局变量，供子线程调用
         GET_VIDEO_COUNT = self.get_video_count
@@ -104,46 +107,13 @@ class MeiPai(robot.Robot):
         IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
-        tool.print_msg("配置文件读取完成")
-
     def main(self):
         global ACCOUNTS
 
-        start_time = time.time()
-
-        if not self.is_download_video:
-            print_error_msg("下载视频没有开启，请检查配置！")
-            tool.process_exit()
-
-        # 创建视频保存目录
-        print_step_msg("创建视频根目录 %s" % VIDEO_DOWNLOAD_PATH)
-        if not tool.make_dir(VIDEO_DOWNLOAD_PATH, 0):
-            print_error_msg("创建视频根目录 %s 失败" % VIDEO_DOWNLOAD_PATH)
-            tool.process_exit()
-
-        # 设置系统cookies
-        if not tool.set_cookie(self.cookie_path, self.browser_version, ("weibo.com", ".sina.com.cn")):
-            print_error_msg("导入浏览器cookies失败")
-            tool.process_exit()
-
-        # 寻找存档，如果没有结束进程
-        account_list = {}
-        if os.path.exists(self.save_data_path):
-            # account_id  video_count  last_video_url
-            account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0", ""])
-            ACCOUNTS = account_list.keys()
-        else:
-            print_error_msg("存档文件 %s 不存在" % self.save_data_path)
-            tool.process_exit()
-
-        # 创建临时存档文件
-        new_save_data_file = open(NEW_SAVE_DATA_PATH, "w")
-        new_save_data_file.close()
-
-        # 启用线程监控是否需要暂停其他下载线程
-        process_control_thread = tool.ProcessControl()
-        process_control_thread.setDaemon(True)
-        process_control_thread.start()
+        # 解析存档文件
+        # account_id  video_count  last_video_url
+        account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0", ""])
+        ACCOUNTS = account_list.keys()
 
         # 循环下载每个id
         main_thread_count = threading.activeCount()
@@ -180,13 +150,9 @@ class MeiPai(robot.Robot):
         tool.remove_dir(VIDEO_TEMP_PATH)
 
         # 重新排序保存存档文件
-        account_list = robot.read_save_data(NEW_SAVE_DATA_PATH, 0, [])
-        temp_list = [account_list[key] for key in sorted(account_list.keys())]
-        tool.write_file(tool.list_to_string(temp_list), self.save_data_path, 2)
-        os.remove(NEW_SAVE_DATA_PATH)
+        robot.rewrite_save_file(NEW_SAVE_DATA_PATH, self.save_data_path)
 
-        duration_time = int(time.time() - start_time)
-        print_step_msg("全部下载完毕，耗时%s秒，共计视频%s个" % (duration_time, TOTAL_VIDEO_COUNT))
+        print_step_msg("全部下载完毕，耗时%s秒，共计视频%s个" % (self.get_run_time(), TOTAL_VIDEO_COUNT))
 
 
 class Download(threading.Thread):
