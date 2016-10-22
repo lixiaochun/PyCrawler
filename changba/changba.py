@@ -53,7 +53,7 @@ def get_user_id(account_id):
     return None
 
 
-# 获取一页的歌曲信息
+# 获取一页的歌曲信息，单条歌曲信息的格式：[歌曲id，歌曲名字，歌曲下载地址]
 # user_id -> 4306405
 def get_one_page_audio_list(user_id, page_count):
     # http://changba.com/member/personcenter/loadmore.php?userid=4306405&pageNum=1
@@ -81,7 +81,7 @@ def get_audio_url(audio_en_word_id):
         audio_source_url = tool.find_sub_string(audio_index_page, 'var a="', '"')
         if audio_source_url:
             # 从JS处解析的规则
-            special_find = re.findall("userwork\/([abc])(\d+)\/(\w+)\/(\w+)\.mp3", audio_source_url)
+            special_find = re.findall("userwork/([abc])(\d+)/(\w+)/(\w+)\.mp3", audio_source_url)
             if len(special_find) == 0:
                 return audio_source_url
             elif len(special_find) == 1:
@@ -100,9 +100,9 @@ class ChangBa(robot.Robot):
         global VIDEO_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
 
-        sys_config = [
-            robot.SYS_DOWNLOAD_VIDEO,
-        ]
+        sys_config = {
+             robot.SYS_DOWNLOAD_VIDEO: True,
+        }
         robot.Robot.__init__(self, sys_config)
 
         # 设置全局变量，供子线程调用

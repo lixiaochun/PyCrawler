@@ -20,6 +20,8 @@ SYS_DOWNLOAD_VIDEO = 'download_video'
 SYS_SET_PROXY = 'set_proxy'
 # 程序是否支持不需要存档文件就可以开始运行
 SYS_NOT_CHECK_SAVE_DATA = 'no_save_data'
+# 程序是否需要设置cookie
+SYS_SET_COOKIE = 'set_cookie'
 
 
 class Robot(object):
@@ -38,13 +40,14 @@ class Robot(object):
         self.start_time = time.time()
 
         # 程序启动配置
-        if not isinstance(sys_config, list):
+        if not isinstance(sys_config, dict):
             self.print_msg("程序启动配置不存在，请检查代码！")
             tool.process_exit()
             return
         sys_download_image = SYS_DOWNLOAD_IMAGE in sys_config
         sys_download_video = SYS_DOWNLOAD_VIDEO in sys_config
         sys_set_proxy = SYS_SET_PROXY in sys_config
+        sys_set_cookie = SYS_SET_COOKIE in sys_config
         sys_not_check_save_data = SYS_NOT_CHECK_SAVE_DATA in sys_config
 
         # exe程序
@@ -65,7 +68,7 @@ class Robot(object):
         self.is_show_step = get_config(config, "IS_SHOW_STEP", True, 2)
         self.is_show_trace = get_config(config, "IS_SHOW_TRACE", False, 2)
         error_log_path = get_config(config, "ERROR_LOG_PATH", "log/errorLog.txt", 3)
-        self.error_log_path = error_log_path.replace("{date}", time.strftime("%y-%m-%d", time.localtime(time.time())))
+        self.error_log_path = replace_path(error_log_path)
         error_log_dir = os.path.dirname(self.error_log_path)
 
         if not tool.make_dir(error_log_dir, 0):
@@ -77,7 +80,7 @@ class Robot(object):
             self.step_log_path = ""
         else:
             step_log_path = get_config(config, "STEP_LOG_PATH", "log/stepLog.txt", 3)
-            self.step_log_path = step_log_path.replace("{date}", time.strftime("%y-%m-%d", time.localtime(time.time())))
+            self.step_log_path = replace_path(step_log_path)
             # 日志文件保存目录
             step_log_dir = os.path.dirname(self.step_log_path)
             if not tool.make_dir(step_log_dir, 0):
@@ -89,7 +92,7 @@ class Robot(object):
             self.trace_log_path = ""
         else:
             trace_log_path = get_config(config, "TRACE_LOG_PATH", "log/traceLog.txt", 3)
-            self.trace_log_path = trace_log_path.replace("{date}", time.strftime("%y-%m-%d", time.localtime(time.time())))
+            self.trace_log_path = replace_path(trace_log_path)
             # 日志文件保存目录
             trace_log_dir = os.path.dirname(self.trace_log_path)
             if not tool.make_dir(trace_log_dir, 0):
@@ -112,7 +115,7 @@ class Robot(object):
 
         if not self.is_download_image and not self.is_download_video:
             # 下载图片和视频都没有开启，请检查配置
-            if (not self.is_download_image and sys_download_image) and (not self.is_download_video and sys_download_video):
+            if not self.is_download_image and sys_download_image and not self.is_download_video and sys_download_video:
                 self.print_msg("下载图片和视频都没有开启，请检查配置！")
             elif not self.is_download_image and sys_download_image:
                 self.print_msg("下载图片没有开启，请检查配置！")
@@ -189,15 +192,20 @@ class Robot(object):
             proxy_port = get_config(config, "PROXY_PORT", "8087", 0)
             tool.set_proxy(proxy_ip, proxy_port)
 
-        # 操作系统&浏览器
-        self.browser_version = get_config(config, "BROWSER_VERSION", 2, 1)
-
-        # cookie
-        is_auto_get_cookie = get_config(config, "IS_AUTO_GET_COOKIE", True, 2)
-        if is_auto_get_cookie:
-            self.cookie_path = tool.get_default_browser_cookie_path(self.browser_version)
-        else:
-            self.cookie_path = get_config(config, "COOKIE_PATH", "", 0)
+        # 浏览器cookies
+        if sys_set_cookie:
+            # 操作系统&浏览器
+            browser_version = get_config(config, "BROWSER_VERSION", 2, 1)
+            # cookie
+            is_auto_get_cookie = get_config(config, "IS_AUTO_GET_COOKIE", True, 2)
+            if is_auto_get_cookie:
+                cookie_path = tool.get_default_browser_cookie_path(browser_version)
+            else:
+                cookie_path = get_config(config, "COOKIE_PATH", "", 0)
+            if not tool.set_cookie(cookie_path, browser_version, ("weibo.com", ".sina.com.cn")):
+                self.print_msg("导入浏览器cookies失败")
+                tool.process_exit()
+                return
 
         # 线程数
         self.thread_count = get_config(config, "THREAD_COUNT", 10, 1)
@@ -227,7 +235,6 @@ class Robot(object):
                 tool.remove_dir(self.video_temp_path)
             else:
                 self.print_msg("视频临时下载目录%s中存在文件" % self.video_temp_path)
-
 
 
 # 读取配置文件
@@ -349,6 +356,11 @@ def sort_save_data(save_data_path, sort_key_index=0):
 # 生成新存档的文件路径
 def get_new_save_file_path(old_save_file_path):
     return os.path.join(os.path.dirname(old_save_file_path), time.strftime("%m-%d_%H_%M_", time.localtime(time.time())) + os.path.basename(old_save_file_path))
+
+
+# 替换目录中的指定字符串
+def replace_path(path):
+    return path.replace("{date}", time.strftime("%y-%m-%d", time.localtime(time.time())))
 
 
 # 判断类型是否为字典，并且检测是否存在指定的key
