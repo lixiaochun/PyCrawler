@@ -177,7 +177,7 @@ def get_image_url_list(cp_id, rp_id):
 
 # 根据当前作品页面，获取作品页数上限
 def get_max_page_count(coser_id, post_page):
-    max_page_count = tool.find_sub_string(post_page, '<a href="/u/%s/post/cos?&p=' % coser_id, '">尾页</a>')
+    max_page_count = tool.find_sub_string(post_page, '<a href="/u/%s/post/cos?&p=' % coser_id, '">')
     if max_page_count:
         max_page_count = int(max_page_count)
     else:
@@ -391,7 +391,7 @@ class Download(threading.Thread):
         except SystemExit:
             print_error_msg(cn + " 异常退出")
         except Exception, e:
-            print_step_msg(cn + " 未知异常")
+            print_error_msg(cn + " 未知异常")
             print_error_msg(str(e) + "\n" + str(traceback.format_exc()))
 
 
