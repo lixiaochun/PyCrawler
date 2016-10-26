@@ -214,11 +214,11 @@ def create_cookie(name, value, domain="", path="/"):
                             rest={"HttpOnly": None}, rfc2109=False)
 
 
-# 使用系统cookies
+# 加载在浏览器中已经保存了的cookies
 # browser_type=1: IE
 # browser_type=2: firefox
 # browser_type=3: chrome
-def set_cookie(file_path, browser_type=1, target_domains=""):
+def set_cookie_from_browser(file_path, browser_type=1, target_domains=""):
     # 有些DB文件开启了WAL功能（SQL3.7引入，Python2.7的sqlite3的版本是3.6，所以需要pysqlite2.8）
     # import sqlite3
     from pysqlite2 import dbapi2 as sqlite
@@ -318,6 +318,13 @@ def _filter_domain(domain, target_domains):
         return False
 
 
+# 设置空的cookies，后续所有请求会携带cookies访问资源
+def set_empty_cookie():
+    cookie_jar = cookielib.MozillaCookieJar()
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie_jar))
+    urllib2.install_opener(opener)
+
+
 # 设置代理
 def set_proxy(ip, port):
     proxy_address = "http://%s:%s" % (ip, port)
@@ -342,7 +349,7 @@ def quickly_set(is_set_cookie, proxy_type):
             cookie_path = robot.tool.get_default_browser_cookie_path(browser_type)
         else:
             cookie_path = robot.get_config(config, "COOKIE_PATH", "", 0)
-        set_cookie(cookie_path, browser_type)
+        set_cookie_from_browser(cookie_path, browser_type)
     if proxy_type == 1:
         proxy_ip = robot.get_config(config, "PROXY_IP", "127.0.0.1", 0)
         proxy_port = robot.get_config(config, "PROXY_PORT", "8087", 0)
@@ -393,7 +400,7 @@ def find_sub_string(string, start_string=None, end_string=None, include_string=0
         if end_string is None:
             stop_index = len(string)
         else:
-            stop_index = string.find(end_string, start_index)
+            stop_index = string.find(end_string, start_index + 1)
         if stop_index >= 0:
             if include_string & 2 == 2:
                 stop_index += len(end_string)

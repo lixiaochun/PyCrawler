@@ -22,7 +22,6 @@ IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
 IS_SORT = True
 IS_DOWNLOAD_IMAGE = True
-IS_DOWNLOAD_VIDEO = True
 
 threadLock = threading.Lock()
 
@@ -73,7 +72,6 @@ class Diary(robot.Robot):
         global NEW_SAVE_DATA_PATH
         global IS_SORT
         global IS_DOWNLOAD_IMAGE
-        global IS_DOWNLOAD_VIDEO
 
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
@@ -86,7 +84,6 @@ class Diary(robot.Robot):
         IMAGE_DOWNLOAD_PATH = self.image_download_path
         IS_SORT = self.is_sort
         IS_DOWNLOAD_IMAGE = self.is_download_image
-        IS_DOWNLOAD_VIDEO = self.is_download_video
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
     def main(self):
@@ -177,8 +174,13 @@ class Download(threading.Thread):
                 if len(diary_list) == 0:
                     break
 
-                for diary_info in diary_list:
+                for diary_info in list(diary_list):
+                    # 日志id
                     diary_id = tool.find_sub_string(diary_info, "id=", "&")
+                    if not diary_id:
+                        print_error_msg(account_name + " 日志id解析异常，日志信息：%s" % diary_info)
+                        continue
+
                     # 检查是否是上一次的最后视频
                     if int(diary_id) <= int(self.account_info[2]):
                         is_over = True
