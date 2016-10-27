@@ -4,11 +4,12 @@
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
-from common import log, tool
+from common import log, process, tool
 import codecs
 import ConfigParser
 import os
 import sys
+import threading
 import time
 
 IS_INIT = False
@@ -20,7 +21,7 @@ SYS_DOWNLOAD_VIDEO = 'download_video'
 SYS_SET_PROXY = 'set_proxy'
 # 程序是否支持不需要存档文件就可以开始运行
 SYS_NOT_CHECK_SAVE_DATA = 'no_save_data'
-# 程序是否需要设置cookie
+# 程序是否需要开启cookie, value不为为空()时，从浏览器中加载相关域名的cookies，否则仅仅添加一个空的cookie对象
 SYS_SET_COOKIE = 'set_cookie'
 
 
@@ -192,26 +193,30 @@ class Robot(object):
             proxy_port = get_config(config, "PROXY_PORT", "8087", 0)
             tool.set_proxy(proxy_ip, proxy_port)
 
-        # 浏览器cookies
+        # cookies
         if sys_set_cookie:
-            # 操作系统&浏览器
-            browser_version = get_config(config, "BROWSER_VERSION", 2, 1)
-            # cookie
-            is_auto_get_cookie = get_config(config, "IS_AUTO_GET_COOKIE", True, 2)
-            if is_auto_get_cookie:
-                cookie_path = tool.get_default_browser_cookie_path(browser_version)
-            else:
-                cookie_path = get_config(config, "COOKIE_PATH", "", 0)
-            if not tool.set_cookie(cookie_path, browser_version, sys_config[SYS_SET_COOKIE]):
-                self.print_msg("导入浏览器cookies失败")
-                tool.process_exit()
-                return
+            if sys_config[SYS_SET_COOKIE]:  # 加载浏览器cookie
+                # 操作系统&浏览器
+                browser_version = get_config(config, "BROWSER_VERSION", 2, 1)
+                # cookie
+                is_auto_get_cookie = get_config(config, "IS_AUTO_GET_COOKIE", True, 2)
+                if is_auto_get_cookie:
+                    cookie_path = tool.get_default_browser_cookie_path(browser_version)
+                else:
+                    cookie_path = get_config(config, "COOKIE_PATH", "", 0)
+                if not tool.set_cookie_from_browser(cookie_path, browser_version, sys_config[SYS_SET_COOKIE]):
+                    self.print_msg("导入浏览器cookies失败")
+                    tool.process_exit()
+                    return
+            else:  # 使用空cookie
+                tool.set_empty_cookie()
 
         # 线程数
         self.thread_count = get_config(config, "THREAD_COUNT", 10, 1)
+        self.thread_lock = threading.Lock()
 
         # 启用线程监控是否需要暂停其他下载线程
-        process_control_thread = tool.ProcessControl()
+        process_control_thread = process.ProcessControl()
         process_control_thread.setDaemon(True)
         process_control_thread.start()
 
@@ -373,3 +378,13 @@ def check_sub_key(needles, haystack):
                 return False
         return True
     return False
+
+
+# 进程是否需要结束
+# 返回码 0: 正常运行; 1 立刻结束; 2 等待现有任务完成后结束
+def is_process_end():
+    if process.PROCESS_STATUS == process.PROCESS_STATUS_STOP:
+        return 1
+    elif process.PROCESS_STATUS == process.PROCESS_STATUS_FINISH:
+        return 2
+    return 0

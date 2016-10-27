@@ -61,13 +61,14 @@ class Template(robot.Robot):
         global IS_DOWNLOAD_IMAGE
         global IS_DOWNLOAD_VIDEO
 
-        # todo 是否需要代理
-        sys_config = [
-            robot.SYS_DOWNLOAD_IMAGE,
-            robot.SYS_DOWNLOAD_VIDEO,
-            robot.SYS_SET_PROXY,
-            robot.SYS_NOT_CHECK_SAVE_DATA,
-        ]
+        # todo 配置
+        sys_config = {
+            robot.SYS_DOWNLOAD_IMAGE: True,
+            robot.SYS_DOWNLOAD_VIDEO: True,
+            robot.SYS_SET_PROXY: True,
+            robot.SYS_NOT_CHECK_SAVE_DATA: True,
+            robot.SYS_SET_COOKIE: ('example.com',)
+        }
         robot.Robot.__init__(self, sys_config)
 
         # 设置全局变量，供子线程调用
@@ -88,12 +89,6 @@ class Template(robot.Robot):
     def main(self):
         global ACCOUNTS
 
-        # todo 是否需要设置cookies
-        # 设置系统cookies
-        if not tool.set_cookie(self.cookie_path, self.browser_version, ()):
-            print_error_msg("导入浏览器cookies失败")
-            tool.process_exit()
-
         # todo 存档文件格式
         # 解析存档文件
         # account_id
@@ -105,13 +100,13 @@ class Template(robot.Robot):
         for account_id in sorted(account_list.keys()):
             # 检查正在运行的线程数
             while threading.activeCount() >= self.thread_count + main_thread_count:
-                if tool.is_process_end() == 0:
+                if robot.is_process_end() == 0:
                     time.sleep(10)
                 else:
                     break
 
             # 提前结束
-            if tool.is_process_end() > 0:
+            if robot.is_process_end() > 0:
                 break
 
             # 开始下载
