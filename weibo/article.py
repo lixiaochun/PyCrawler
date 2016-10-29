@@ -95,7 +95,6 @@ def get_article_url(preview_article_data):
 # 根据文章预览页面，获取文章总页数
 def get_max_page_count(preview_article_data):
     page_count_find = re.findall('Pl_Core_ArticleList__63\\\\">([\d]+)<\\\\/a>', preview_article_data)
-    print page_count_find
     return max(map(int, page_count_find))
 
 
@@ -115,6 +114,16 @@ def get_article_id(article_url):
     return None
 
 
+# 根据文章页面，获取文章标题
+def get_article_title(article_page, article_type):
+    if article_type == "t":
+        return tool.find_sub_string(article_page, '<div class="title" node-type="articleTitle">', "</div>")
+    elif article_type == "p":
+        return tool.find_sub_string(article_page, '<h1 class=\\"title\\">', "<\\/h1>")
+    else:
+        return None
+
+
 # 根据文章页面，获取文章顶部的图片地址
 def get_article_top_picture_url(article_page):
     article_top_picture = tool.find_sub_string(article_page, '<div class="main_toppic">', '<div class="main_editor')
@@ -123,15 +132,21 @@ def get_article_top_picture_url(article_page):
 
 
 # 根据文章页面，获取正文中的所有图片地址列表
-def get_article_image_url_list(article_page):
-    article_body = tool.find_sub_string(article_page, '<div class="WB_editor_iframe', '<div class="artical_add_box"')
+def get_article_image_url_list(article_page, article_type):
+    if article_type == "t":
+        article_body = tool.find_sub_string(article_page, '<div class="WB_editor_iframe', '<div class="artical_add_box"')
+    elif article_type == "p":
+        article_body = tool.find_sub_string(article_page, '{"ns":"pl.content.longFeed.index"', "</script>")
+        article_body = article_body.replace("\\", "")
+    else:
+        return None
     if article_body:
         return re.findall('<img[^>]* src="([^"]*)"[^>]*>', article_body)
     return None
 
 
 class Article(robot.Robot):
-    def __init__(self, extra_config=None):
+    def __init__(self):
         global GET_IMAGE_COUNT
         global IMAGE_TEMP_PATH
         global IMAGE_DOWNLOAD_PATH
@@ -142,6 +157,9 @@ class Article(robot.Robot):
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
             robot.SYS_SET_COOKIE: ("weibo.com", ".sina.com.cn"),
+        }
+        extra_config = {
+            "save_data_path": os.path.join(os.path.abspath(""), "info\\article.data",)
         }
         robot.Robot.__init__(self, sys_config, extra_config)
 
@@ -180,7 +198,7 @@ class Article(robot.Robot):
                 break
 
             # 开始下载
-            thread = Download(account_list[account_id], self.thread_count)
+            thread = Download(account_list[account_id], self.thread_lock)
             thread.start()
 
             time.sleep(1)
@@ -196,9 +214,6 @@ class Article(robot.Robot):
                 new_save_data_file.write("\t".join(account_list[account_id]) + "\n")
             new_save_data_file.close()
 
-        # 删除临时文件夹
-        tool.remove_dir(IMAGE_TEMP_PATH)
-
         # 重新排序保存存档文件
         robot.rewrite_save_file(NEW_SAVE_DATA_PATH, self.save_data_path)
 
@@ -206,10 +221,10 @@ class Article(robot.Robot):
 
 
 class Download(threading.Thread):
-    def __init__(self, account_info, thread_count):
+    def __init__(self, account_info, thread_lock):
         threading.Thread.__init__(self)
         self.account_info = account_info
-        self.thread_count = thread_count
+        self.thread_lock = thread_lock
 
     def run(self):
         global TOTAL_IMAGE_COUNT
@@ -223,12 +238,6 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
-            else:
-                image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-
             # 获取账号对应的page_id
             account_page_id = get_account_page_id(account_id)
             if account_page_id is None:
@@ -239,6 +248,7 @@ class Download(threading.Thread):
             this_account_total_image = 0
             first_article_time = "0"
             is_over = False
+            image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
             while not is_over:
                 # 获取一页文章预览页面
                 preview_article_page = get_one_page_preview_article_data(account_page_id, page_count)
@@ -288,7 +298,7 @@ class Download(threading.Thread):
                         continue
 
                     # 文章标题
-                    title = tool.find_sub_string(article_page, '<div class="title" node-type="articleTitle">', "</div>")
+                    title = get_article_title(article_page, article_id[0])
                     # 标题处理
                     for filter_char in ["\\", "/", ":", "*", "?", '"', "<", ">", "|"]:
                         title = title.replace(filter_char, " ")  # 过滤一些windows文件名屏蔽的字符
@@ -319,13 +329,15 @@ class Download(threading.Thread):
                             log.error(account_name + " %s 顶部图片 %s 下载失败" % (title, top_picture_url))
 
                     # 获取文章正文的图片地址列表
-                    image_url_list = get_article_image_url_list(article_page)
+                    image_url_list = get_article_image_url_list(article_page, article_id[0])
                     if image_url_list is None:
                         log.error(account_name + " 文章 %s 正文解析失败" % article_url)
                         continue
 
                     image_count = 1
                     for image_url in list(image_url_list):
+                        if image_url.find("/p/e_weibo_com") >= 0 or image_url.find("e.weibo.com") >= 0:
+                            continue
                         log.step(account_name + " %s 开始下载第%s张图片 %s" % (title, image_count, image_url))
 
                         file_type = image_url.split(".")[-1]
@@ -348,26 +360,16 @@ class Download(threading.Thread):
 
             log.step(account_name + " 下载完毕，总共获得%s张图片" % this_account_total_image)
 
-            # 排序
-            if IS_SORT:
-                if first_article_time != "0":
-                    destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-                    if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
-                        log.step(account_name + " 图片从下载目录移动到保存目录成功")
-                    else:
-                        log.error(account_name + " 创建图片保存目录 %s 失败" % destination_path)
-                        tool.process_exit()
-
             # 新的存档记录
             if first_article_time != "0":
                 self.account_info[1] = first_article_time
 
             # 保存最后的信息
             tool.write_file("\t".join(self.account_info), NEW_SAVE_DATA_PATH)
-            self.thread_count.acquire()
+            self.thread_lock.acquire()
             TOTAL_IMAGE_COUNT += this_account_total_image
             ACCOUNTS.remove(account_id)
-            self.thread_count.release()
+            self.thread_lock.release()
 
             log.step(account_name + " 完成")
         except SystemExit, se:
