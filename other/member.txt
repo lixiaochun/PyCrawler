@@ -11,9 +11,7 @@
 谷口めぐ	Taniguchi Megu	AKB48 Team A
 中西智代梨	Nakanishi Chiyori	AKB48 Team A
 中村麻里子	Nakamura Mariko	AKB48 Team A
-平田梨奈	Hirata Rina	AKB48 Team A
 樋渡結依	Hiwatashi Yui	AKB48 Team A
-前田亜美	Maeda Ami	AKB48 Team A
 宮崎美穂	Miyazaki Miho	AKB48 Team A
 宮脇咲良	Miyawaki Sakura	AKB48 Team A / HKT48 Team K IV
 山田菜々美	Yamada Nanami	AKB48 Team A / AKB48 Team 8
@@ -52,7 +50,6 @@
 矢吹奈子	Yabuki Nako	AKB48 Team B / HKT48 Team H
 横島亜衿	Yokoshima Aeri	AKB48 Team B
 渡辺麻友	Watanabe Mayu	AKB48 Team B
-渡辺美優紀	Watanabe Miyuki	AKB48 Team B / NMB48 Team B II
 高橋希良	Takahashi Kira	Team B Understudy
 西川怜	Nishikawa Rei	Team B Understudy
 山邊歩夢	Yamabe Ayu	Team B Understudy
@@ -97,9 +94,7 @@
 服部有菜	Hattori Yuna	AKB48 Team 8
 野田陽菜乃	Noda Hinano	AKB48 Team 8
 橋本陽菜	Hashimoto Haruna	AKB48 Team 8
-北玲名	Kita Reina	AKB48 Team 8
 長久玲奈	Cho Kurena	AKB48 Team 8
-近藤萌恵里	Kondo Moeri	AKB48 Team 8
 永野芹佳	Nagano Serika	AKB48 Team 8
 太田奈緒	Ota Nao	AKB48 Team 8
 山田菜々美	Yamada Nanami	AKB48 Team A / AKB48 Team 8
@@ -123,8 +118,6 @@
 谷口もか	Yaguchi Moka	AKB48 Team 8
 下青木香鈴	Shimoaoki Karin	AKB48 Team 8
 宮里莉羅	Miyazato Rira	AKB48 Team 8
-繁藤冬佳	Shigefuji Fuyuka	Part-time AKB
-日出有香	Hinode Yuka	Part-time AKB
 青木詩織	Aoki Shiori	SKE48 Team KII
 荒井優希	Arai Yuki	SKE48 Team KII
 石田安奈	Ishida Anna	SKE48 Team KII
@@ -150,7 +143,6 @@
 末永桜花	Suenaga Oka	SKE48 Team Kenkyusei
 髙畑結希	Takahata Yuki	SKE48 Team Kenkyusei
 町音葉	Machi Otoha	SKE48 Team Kenkyusei
-村井純奈	Murai Junna	SKE48 Team Kenkyusei
 和田愛菜	Wada Aina	SKE48 Team Kenkyusei
 一色嶺奈	Isshiki Rena	SKE48 Team Kenkyusei
 上村亜柚香	Kamimura Ayuka	SKE48 Team Kenkyusei
@@ -164,7 +156,6 @@
 斉藤真木子	Saito Makiko	SKE48 Team E
 酒井萌衣	Sakai Mei	SKE48 Team E
 佐藤すみれ	Sato Sumire	SKE48 Team E
-柴田阿弥	Shibata Aya	SKE48 Team E
 菅原茉椰	Sugawara Maya	SKE48 Team E
 須田亜香里	Suda Akari	SKE48 Team E
 髙寺沙菜	Takatera Sana	SKE48 Team E
@@ -183,7 +174,6 @@
 二村春香	Futamura Haruka	SKE48 Team S
 松井珠理奈	Matsui Jurina	SKE48 Team S
 松本慈子	Matsumoto Chikako	SKE48 Team S
-宮前杏実	Miyamae Ami	SKE48 Team S
 矢方美紀	Yakata Miki	SKE48 Team S
 山内鈴蘭	Yamauchi Suzuran	SKE48 Team S
 山田樹奈	Yamada Juna	SKE48 Team S
@@ -191,7 +181,6 @@
 石田優美	Ishida Yuumi	NMB48 Team N
 太田夢莉	Ota Yuuri	NMB48 Team N
 加藤夕夏	Kato Yuuka	NMB48 Team N
-岸野里香	Kishino Rika	NMB48 Team N
 古賀成美	Koga Narumi	NMB48 Team N
 城恵理子	Jo Eriko	NMB48 Team N
 上西恵	Jonishi Kei	NMB48 Team N
@@ -209,11 +198,12 @@
 川上礼奈	Kawakami Rena	NMB48 Team M
 木下百花	Kinoshita Momoka	NMB48 Team M
 久代梨奈	Kushiro Rina	NMB48 Team M
-白間美瑠	Shiroma Miru	NMB48 Team M
+白間美瑠	Shiroma Miru	NMB48 Team M / AKB48 TeamA
 武井紗良	Takei Sara	NMB48 Team M
 谷川愛梨	Tanigawa Airi	NMB48 Team M
 中野麗来	Nakano Reina	NMB48 Team M
 藤江れいな	Fujie Reina	NMB48 Team M
+堀詩音	Hori Shion	NMB48 Team M
 松村芽久未	Matsumura Megumi	NMB48 Team M
 三田麻央	Mita Mao	NMB48 Team M
 村瀬紗英	Murase Sae	NMB48 Team M
@@ -222,22 +212,17 @@
 井尻晏菜	Ijiri Anna	NMB48 Team BII
 磯佳奈江	Iso Kanae	NMB48 Team BII
 市川美織	Ichikawa Miori	NMB48 Team BII
-植田碧麗	Ueda Mirei	NMB48 Team BII
 大段舞依	Odan Mai	NMB48 Team BII
 上枝恵美加	Kamieda Emika	NMB48 Team BII
 川上千尋	Kawakami Chihiro	NMB48 Team BII
-木下春奈	Kinoshita Haruna	NMB48 Team BII
 日下このみ	Kusaka Konomi	NMB48 Team BII
 黒川葉月	Kurokawa Hazuki	NMB48 Team BII
 渋谷凪咲	Shibuya Nagisa	NMB48 Team BII / AKB48 Team4
 内木志	Naiki Kokoro	NMB48 Team BII
 林萌々香	Hayashi Momoka	NMB48 Team BII
-松岡知穂	Matsuoka Chiho	NMB48 Team BII
 薮下柊	Yabushita Shu	NMB48 Team BII
-渡辺美優紀	Watanabe Miyuki	NMB48 Team BII
 西仲七海	Nishinaka Nanami	NMB48 Team Kenkyusei
 本郷柚巴	Hongo Yuzuha	NMB48 Team Kenkyusei
-堀詩音	Hori Shion	NMB48 Team Kenkyusei
 安藤愛璃菜	Ando Erina	NMB48 Team Kenkyusei
 村中有基	Muranaka Yuki	NMB48 Team Kenkyusei
 安田桃寧	Yasuda Momone	NMB48 Team Kenkyusei
@@ -252,7 +237,6 @@
 山田寿々	Yamada Suzu	NMB48 Team Kenkyusei
 山本彩加	Yamamoto Ayaka	NMB48 Team Kenkyusei
 秋吉優花	Akiyoshi Yuka	Team H
-穴井千尋	Anai Chihiro	Team H
 井上由莉耶	Inoue Yuriya	Team H
 宇井真白	Ui Mashiro	Team H
 上野遥	Ueno Haruka	Team H
@@ -295,6 +279,16 @@
 村川緋杏	Murakawa Bibian	Team TII
 山内祐奈	Yamauchi Yuna	Team TII
 山下エミリー	Yamashita Emiri	Team TII
+運上弘菜	Unjo Hirona	研究生
+小田彩加	Oda Ayaka	研究生
+堺萌香	Sakai Moeka	研究生
+清水梨央	Shimizu Rio	研究生
+武田智加	Takeda Tomoka	研究生
+地頭江音々	Jitoe Nene	研究生
+月足天音	Tsukiashi Amane	研究生
+豊永阿紀	Toyonaga Aki	研究生
+松本日向	Matsumoto Hinata	研究生
+宮崎想乃	Miyazaki Sono	研究生
 Ayana Shahab	Ayana Shahab	JKT48 Team J
 Beby Chaesara Anadila	Beby Chaesara Anadila	JKT48 Team J
 Dena Siti Rohyati	Dena Siti Rohyati	JKT48 Team J
@@ -306,7 +300,6 @@ Jessica Vania	Jessica Vania	JKT48 Team J
 Jessica Veranda	Jessica Veranda	JKT48 Team J
 Melody Nurramdhani Laksani	Melody Nurramdhani Laksani	JKT48 Team J
 Nabilah Ratna Ayu Azalia	Nabilah Ratna Ayu Azalia	JKT48 Team J
-Rezky Wiranti Dhike	Rezky Wiranti Dhike	JKT48 Team J
 Sendy Ariani	Sendy Ariani	JKT48 Team J
 Shania Junianatha	Shania Junianatha	JKT48 Team J
 Shinta Naomi	Shinta Naomi	JKT48 Team J
@@ -318,7 +311,6 @@ Della Delila	Della Delila	JKT48 Team KIII
 Devi Kinal Putri	Devi Kinal Putri	JKT48 Team KIII
 Dwi Putri Bonita	Dwi Putri Bonita	JKT48 Team KIII
 Fakhriyani Shafariyanti	Fakhriyani Shafariyanti	JKT48 Team KIII
-Jennifer Hanna	Jennifer Hanna	JKT48 Team KIII
 Lidya Maulida Djuhandar	Lidya Maulida Djuhandar	JKT48 Team KIII
 Nadila Cindi Wantari	Nadila Cindi Wantari	JKT48 Team KIII
 Natalia	Natalia	JKT48 Team KIII
@@ -363,11 +355,9 @@ Elizabeth Gloria Setiawan	Elizabeth Gloria Setiawan	JKT48 Team kenkyusei
 Eve Antoinette Ichwan	Eve Antoinette Ichwan	JKT48 Team kenkyusei
 Gabryela Marcelina	Gabryela Marcelina	JKT48 Team kenkyusei
 Hasyakyla Utami Kusumawardhani	Hasyakyla Utami Kusumawardhani	JKT48 Team kenkyusei
-Helma Sonya	Helma Sonya	JKT48 Team kenkyusei
 Nurhayati	Nurhayati	JKT48 Team kenkyusei
 Puti Nadhira Azalia	Puti Nadhira Azalia	JKT48 Team kenkyusei
 Regina Angelina	Regina Angelina	JKT48 Team kenkyusei
-Rissanda Putri Tuarissa	Rissanda Putri Tuarissa	JKT48 Team kenkyusei
 Ruth Damayanti Sitanggang	Ruth Damayanti Sitanggang	JKT48 Team kenkyusei
 Sania Julia Montolalu	Sania Julia Montolalu	JKT48 Team kenkyusei
 Violeta Burhan	Violeta Burhan	JKT48 Team kenkyusei
