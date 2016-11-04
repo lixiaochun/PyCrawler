@@ -1,7 +1,7 @@
 # -*- coding:UTF-8  -*-
 """
-美拍视频爬虫
-http://www.meipai.com/
+微视视频爬虫
+http://weishi.qq.com
 @author: hikaru
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
@@ -9,14 +9,13 @@ email: hikaru870806@hotmail.com
 from common import log, robot, tool
 import json
 import os
-import re
+import random
 import threading
 import time
 import traceback
 
 ACCOUNTS = []
 TOTAL_VIDEO_COUNT = 0
-VIDEO_COUNT_PER_PAGE = 20  # 每次请求获取的视频数量
 GET_VIDEO_COUNT = 0
 VIDEO_TEMP_PATH = ""
 VIDEO_DOWNLOAD_PATH = ""
@@ -24,50 +23,44 @@ NEW_SAVE_DATA_PATH = ""
 IS_SORT = True
 
 
-# 获取指定账号的全部关注列表
-def get_follow_list(account_id):
-    max_page_count = 1
-    page_count = 1
-    follow_list = {}
-    while page_count <= max_page_count:
-        follow_list_url = "http://www.meipai.com/user/%s/friends?p=%s" % (account_id, page_count)
-        follow_list_page_return_code, follow_list_page = tool.http_request(follow_list_url)[:2]
-        if follow_list_page_return_code == 1:
-            follow_list_find = re.findall('<div class="ucard-info">([\s|\S]*?)</div>', follow_list_page)
-            for follow_info in follow_list_find:
-                follow_account_id = tool.find_sub_string(follow_info, '<a hidefocus href="/user/', '"').strip()
-                follow_account_name = tool.find_sub_string(follow_info, 'title="', '"')
-                follow_list[follow_account_id] = follow_account_name
-            if max_page_count == 1:
-                page_info = tool.find_sub_string(follow_list_page, '<div class="paging-wrap">', '</div>')
-                if page_info:
-                    page_find = re.findall("friends\?p=(\d*)", page_info)
-                    page_find = [int(i) for i in page_find]
-                    max_page_count = max(page_find)
-            page_count += 1
-        else:
-            return None
-    return follow_list
-
-
-# 获取一页的视频信息
-def get_one_page_video_data(account_id, page_count):
-    # http://www.meipai.com/users/user_timeline?uid=22744352&page=1&count=20&single_column=1
-    video_page_url = "http://www.meipai.com/users/user_timeline"
-    video_page_url += "?uid=%s&page=%s&count=%s&single_column=1" % (account_id, page_count, VIDEO_COUNT_PER_PAGE)
-    video_page_return_code, video_page = tool.http_request(video_page_url)[:2]
-    if video_page_return_code == 1:
+# 获取账号指定一页的视频信息
+def get_one_page_video_data(account_id, page_time):
+    video_data_url = "http://wsm.qq.com/weishi/t/other.php?uid=%s&reqnum=5" % account_id
+    if page_time > 0:
+        video_data_url += "&pageflag=02&pagetime=%s" % page_time
+    else:
+        video_data_url += "&pageflag=0"
+    header_list = {"Referer": 'http://weishi.qq.com/'}
+    video_data_return_code, video_data = tool.http_request(video_data_url, None, header_list)[:2]
+    if video_data_return_code == 1:
         try:
-            video_page = json.loads(video_page)
+            video_data = json.loads(video_data)
         except ValueError:
             pass
         else:
-            if robot.check_sub_key(("medias", ), video_page):
-                return video_page["medias"]
+            if robot.check_sub_key(("ret", "data"), video_data) and int(video_data["ret"]) == 0:
+                if robot.check_sub_key(("info", "hasNext"), video_data["data"]):
+                    return video_data["data"]
     return None
 
 
-class MeiPai(robot.Robot):
+# 根据视频id和vid获取视频下载地址
+def get_video_url(video_vid, video_id):
+    video_info_url = "http://wsi.weishi.com/weishi/video/downloadVideo.php?vid=%s&id=%s" % (video_vid, video_id)
+    video_info_page_return_code, video_info_page = tool.http_request(video_info_url)[:2]
+    if video_info_page_return_code == 1:
+        try:
+            video_info_page = json.loads(video_info_page)
+        except ValueError:
+            pass
+        else:
+            if robot.check_sub_key(("data", ), video_info_page):
+                if robot.check_sub_key(("url", ), video_info_page["data"]):
+                    return str(random.choice(video_info_page["data"]["url"]))
+    return None
+
+
+class WeiShi(robot.Robot):
     def __init__(self):
         global GET_VIDEO_COUNT
         global VIDEO_TEMP_PATH
@@ -87,12 +80,14 @@ class MeiPai(robot.Robot):
         IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
+        tool.print_msg("配置文件读取完成")
+
     def main(self):
         global ACCOUNTS
 
         # 解析存档文件
-        # account_id  video_count  last_video_url
-        account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0", ""])
+        # account_id  video_count  last_video_time
+        account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0"])
         ACCOUNTS = account_list.keys()
 
         # 循环下载每个id
@@ -159,84 +154,79 @@ class Download(threading.Thread):
             else:
                 video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
 
-            page_count = 1
             video_count = 1
-            first_video_id = "0"
-            unique_list = []
+            page_time = 0
+            first_video_time = "0"
+            need_make_video_dir = True
             is_over = False
-            need_make_download_dir = True
             while not is_over:
-                # 获取指定一页的视频信息
-                medias_data = get_one_page_video_data(account_id, page_count)
-                if medias_data is None:
+                # 获取一页视频信息
+                video_data = get_one_page_video_data(account_id, page_time)
+                if video_data is None:
                     log.error(account_name + " 视频列表获取失败")
                     tool.process_exit()
 
-                for media in medias_data:
-                    if not robot.check_sub_key(("video", "id"), media):
-                        log.error(account_name + " 第%s个视频信：%s解析失败" % (video_count, media))
+                for video_info in video_data["info"]:
+                    if not robot.check_sub_key(("newvideos", "id", "timestamp"), video_info):
+                        log.error(account_name + " 视频信息 %s 解析失败" % video_info)
                         continue
 
-                    video_id = str(media["id"])
-
-                    # 检查是否图片时间小于上次的记录
-                    if int(video_id) <= int(self.account_info[2]):
+                    page_time = int(video_info["timestamp"])
+                    # 检查是否已下载到前一次的视频
+                    if page_time <= int(self.account_info[2]):
                         is_over = True
                         break
 
-                    # 新增视频导致的重复判断
-                    if video_id in unique_list:
-                        continue
-                    else:
-                        unique_list.append(video_id)
-                    # 将第一张图片的上传时间做为新的存档记录
-                    if first_video_id == "0":
-                        first_video_id = video_id
+                    # 将第一个视频的上传时间做为新的存档记录
+                    if first_video_time == "0":
+                        first_video_time = str(page_time)
 
-                    video_url = str(media["video"])
+                    # todo 处理如果有多个视频
+                    if len(video_info["newvideos"]) != 1:
+                        log.error(account_name + " 视频信息 %s 发现多个视频下载信息" % video_info)
+                        continue
+                    if not robot.check_sub_key(("vid",), video_info["newvideos"][0]):
+                        log.error(account_name + " 视频信息 %s 解析vid失败" % video_info)
+                        continue
+
+                    # 获取视频下载地址
+                    video_url = get_video_url(video_info["newvideos"][0]["vid"], video_info["id"])
                     log.step(account_name + " 开始下载第%s个视频 %s" % (video_count, video_url))
 
                     # 第一个视频，创建目录
-                    if need_make_download_dir:
+                    if need_make_video_dir:
                         if not tool.make_dir(video_path, 0):
-                            log.error(account_name + " 创建视频下载目录 %s 失败" % video_path)
+                            log.error(account_name + " 创建图片下载目录 %s 失败" % video_path)
                             tool.process_exit()
-                        need_make_download_dir = False
-                        
-                    file_path = os.path.join(video_path, "%04d.mp4" % video_count)
+                        need_make_video_dir = False
+
+                    file_type = video_url.split(".")[-1].split("?")[0]
+                    file_path = os.path.join(video_path, "%04d.%s" % (video_count, file_type))
                     if tool.save_net_file(video_url, file_path):
                         log.step(account_name + " 第%s个视频下载成功" % video_count)
                         video_count += 1
                     else:
                         log.error(account_name + " 第%s个视频 %s 下载失败" % (video_count, video_url))
 
-                    # 达到配置文件中的下载数量，结束
-                    if 0 < GET_VIDEO_COUNT < video_count:
-                        is_over = True
-                        break
-
-                if not is_over:
-                    if len(medias_data) >= VIDEO_COUNT_PER_PAGE:
-                        page_count += 1
-                    else:
-                        # 获取的数量小于请求的数量，已经没有剩余视频了
-                        is_over = True
+                if not video_data["hasNext"]:
+                    is_over = True
 
             log.step(account_name + " 下载完毕，总共获得%s个视频" % (video_count - 1))
 
             # 排序
-            if IS_SORT and video_count > 1:
-                destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-                if robot.sort_file(video_path, destination_path, int(self.account_info[1]), 4):
-                    log.step(account_name + " 视频从下载目录移动到保存目录成功")
-                else:
-                    log.error(account_name + " 创建视频保存目录 %s 失败" % destination_path)
-                    tool.process_exit()
+            if IS_SORT:
+                if first_video_time != "0":
+                    destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
+                    if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
+                        log.step(account_name + " 视频从下载目录移动到保存目录成功")
+                    else:
+                        log.error(account_name + " 创建视频保存目录 %s 失败" % destination_path)
+                        tool.process_exit()
 
             # 新的存档记录
-            if first_video_id != "":
-                self.account_info[1] = str(int(self.account_info[1]) + video_count - 1)
-                self.account_info[2] = first_video_id
+            if first_video_time != "0":
+                self.account_info[3] = str(int(self.account_info[3]) + video_count - 1)
+                self.account_info[4] = first_video_time
 
             # 保存最后的信息
             tool.write_file("\t".join(self.account_info), NEW_SAVE_DATA_PATH)
@@ -257,4 +247,4 @@ class Download(threading.Thread):
 
 
 if __name__ == "__main__":
-    MeiPai().main()
+    WeiShi().main()

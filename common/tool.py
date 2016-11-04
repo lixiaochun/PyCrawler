@@ -33,7 +33,7 @@ else:
 # http请求
 # 返回 【返回码，数据, response】
 # 返回码 1：正常返回；-1：无法访问；-100：URL格式不正确；其他< 0：网页返回码
-def http_request(url, post_data=None, cookie=None):
+def http_request(url, post_data=None, header_list=None, cookie=None):
     global IS_SET_TIMEOUT
     if not (url.find("http://") == 0 or url.find("https://") == 0):
         return -100, None, None
@@ -52,6 +52,9 @@ def http_request(url, post_data=None, cookie=None):
                 request = urllib2.Request(url)
             # 设置头信息
             request.add_header("User-Agent", random_user_agent())
+            if isinstance(header_list, dict):
+                for header_name, header_value in header_list.iteritems():
+                    request.add_header(header_name, header_value)
 
             # cookies
             if isinstance(cookie, cookielib.CookieJar):
@@ -291,8 +294,8 @@ def set_proxy(ip, port):
 
 # 快速设置cookie和代理
 # is_set_cookie     0:不设置, 1:设置
-# proxy_type        0:不设置, 1:设置
-def quickly_set(is_set_cookie, proxy_type):
+# is_set_proxy      0:不设置, 1:设置
+def quickly_set(is_set_cookie, is_set_proxy):
     import robot
     config = robot.read_config(os.path.join(os.getcwd(), "..\\common\\config.ini"))
     if is_set_cookie == 1:
@@ -305,7 +308,7 @@ def quickly_set(is_set_cookie, proxy_type):
         else:
             cookie_path = robot.get_config(config, "COOKIE_PATH", "", 0)
         set_cookie_from_browser(cookie_path, browser_type)
-    if proxy_type == 1:
+    if is_set_proxy == 1:
         proxy_ip = robot.get_config(config, "PROXY_IP", "127.0.0.1", 0)
         proxy_port = robot.get_config(config, "PROXY_PORT", "8087", 0)
         set_proxy(proxy_ip, proxy_port)
