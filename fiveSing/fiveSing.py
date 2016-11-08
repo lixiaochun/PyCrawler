@@ -138,14 +138,14 @@ class Download(threading.Thread):
             log.step(account_name + " 开始")
 
             video_count = 1
-            need_make_download_dir = True
             for audio_type in audio_type_to_index.keys():
                 video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name, audio_type)
 
                 page_count = 1
                 first_audio_id = "0"
-                is_over = False
                 unique_list = []
+                is_over = False
+                need_make_download_dir = True
                 while not is_over:
                     # 获取指定一页的歌曲信息列表
                     audio_list = get_one_page_audio_list(account_id, audio_type, page_count)
@@ -162,6 +162,9 @@ class Download(threading.Thread):
                     for audio_info in list(audio_list):
                         audio_id = audio_info[0]
                         audio_title = audio_info[1]
+                        for filter_char in ["\\", "/", ":", "*", "?", '"', "<", ">", "|"]:
+                            audio_title = audio_title.replace(filter_char, " ")  # 过滤一些windows文件名屏蔽的字符
+                        audio_title = audio_title.strip().rstrip(".")  # 去除前后空格以及后缀的.
 
                         # 检查是否歌曲id小于上次的记录
                         if int(audio_id) <= int(self.account_info[audio_type_to_index[audio_type]]):
