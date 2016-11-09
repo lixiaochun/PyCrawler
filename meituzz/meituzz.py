@@ -49,7 +49,7 @@ class MeiTuZZ(robot.Robot):
                 error_count += 1
                 if error_count >= 10:
                     log.error("连续10页相册没有图片，退出程序")
-                    album_id += error_count - 1
+                    album_id -= error_count - 1
                     break
                 else:
                     log.error("第%s页相册已被删除" % album_id)
@@ -76,7 +76,7 @@ class MeiTuZZ(robot.Robot):
             # 错误数量重置
             error_count = 0
 
-            image_path = os.path.join(self.image_download_path, str(album_id))
+            image_path = os.path.join(self.image_download_path, "%04d" % album_id)
             if not tool.make_dir(image_path, 0):
                 log.error("创建图片下载目录 %s 失败" % image_path)
                 break
