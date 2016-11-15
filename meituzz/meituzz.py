@@ -72,9 +72,8 @@ class MeiTuZZ(robot.Robot):
                 album_reward_find = re.findall('<input type="hidden" id="rewardAmount" value="(\d*)">', album_page)
                 if len(album_reward_find) == 1:
                     album_reward = int(album_reward_find[0])
-                    if album_reward > 0:
+                    if album_reward > 0 and int(total_photo_count_find[0]) - len(image_url_list) <= 1:
                         is_fee = True
-                        log.error("第%s页解析有%s张收费图片" % (album_id, (int(total_photo_count_find[0]) - len(image_url_list))))
                 if not is_fee:
                     log.error("第%s页解析获取的图片数量不符" % album_id)
                     break
@@ -121,10 +120,11 @@ class MeiTuZZ(robot.Robot):
         save_file.write(str(album_id))
         save_file.close()
         # 收费相册
-        fee_save_data_path = os.path.join(save_data_dir, "fee.data")
-        fee_save_data_file = open(fee_save_data_path, "a")
-        fee_save_data_file.write(" ".join(fee_album_list) + " ")
-        fee_save_data_file.close()
+        if len(fee_album_list) > 0:
+            fee_save_data_path = os.path.join(save_data_dir, "fee.data")
+            fee_save_data_file = open(fee_save_data_path, "a")
+            fee_save_data_file.write(" ".join(fee_album_list) + " ")
+            fee_save_data_file.close()
 
         log.step("全部下载完毕，耗时%s秒，共计图片%s张" % (self.get_run_time(), total_image_count))
 
