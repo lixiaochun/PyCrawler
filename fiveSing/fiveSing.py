@@ -17,6 +17,7 @@ import traceback
 ACCOUNTS = []
 TOTAL_VIDEO_COUNT = 0
 GET_VIDEO_COUNT = 0
+GET_PAGE_COUNT = 0
 VIDEO_TEMP_PATH = ""
 VIDEO_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
@@ -55,6 +56,7 @@ def get_audio_url(audio_id, song_type):
 class FiveSing(robot.Robot):
     def __init__(self):
         global GET_VIDEO_COUNT
+        global GET_PAGE_COUNT
         global VIDEO_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
 
@@ -66,6 +68,7 @@ class FiveSing(robot.Robot):
 
         # 设置全局变量，供子线程调用
         GET_VIDEO_COUNT = self.get_video_count
+        GET_PAGE_COUNT = self.get_page_count
         VIDEO_DOWNLOAD_PATH = self.video_download_path
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
@@ -125,6 +128,7 @@ class Download(threading.Thread):
 
     def run(self):
         global TOTAL_VIDEO_COUNT
+        global GET_PAGE_COUNT
 
         account_id = self.account_info[0]
         if len(self.account_info) >= 4 and self.account_info[3]:
@@ -191,10 +195,10 @@ class Download(threading.Thread):
 
                         log.step(account_name + " 开始下载第%s首歌曲 %s" % (video_count, audio_url))
 
-                        # 第一个视频，创建目录
+                        # 第一首歌曲，创建目录
                         if need_make_download_dir:
                             if not tool.make_dir(video_path, 0):
-                                log.error(account_name + " 创建视频下载目录 %s 失败" % video_path)
+                                log.error(account_name + " 创建歌曲下载目录 %s 失败" % video_path)
                                 tool.process_exit()
                             need_make_download_dir = False
 
@@ -211,9 +215,12 @@ class Download(threading.Thread):
                             break
 
                     if not is_over:
+                        # 达到配置文件中的下载页数，结束
+                        if 0 < GET_PAGE_COUNT <= page_count:
+                            is_over = True
                         # 获取的歌曲数量少于1页的上限，表示已经到结束了
                         # 如果歌曲数量正好是页数上限的倍数，则由下一页获取是否为空判断
-                        if len(audio_list) < 20:
+                        elif len(audio_list) < 20:
                             is_over = True
                         else:
                             page_count += 1

@@ -118,6 +118,7 @@ class Tumblr(robot.Robot):
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
             robot.SYS_DOWNLOAD_VIDEO: True,
+            robot.SYS_SET_PROXY: True,
         }
         robot.Robot.__init__(self, sys_config)
 
@@ -317,7 +318,7 @@ class Download(threading.Thread):
 
                 if not is_over:
                     # 达到配置文件中的下载数量，结束
-                    if 0 < GET_PAGE_COUNT < page_count:
+                    if 0 < GET_PAGE_COUNT <= page_count:
                         is_over = True
                     else:
                         page_count += 1
