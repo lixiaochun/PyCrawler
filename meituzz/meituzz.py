@@ -7,8 +7,22 @@ email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
 from common import log, robot, tool
+import json
 import os
 import re
+
+
+# 根据页面内容获取图片地址列表
+def get_image_url_list(album_page):
+    image_url_list_find = tool.find_sub_string(album_page, '<input type="hidden" id="imageList" value=', ' />')
+    try:
+        image_url_list_find = json.loads(image_url_list_find)
+    except ValueError:
+        return None
+    image_url_list = []
+    for temp_image_list in image_url_list_find:
+        image_url_list += temp_image_list
+    return image_url_list
 
 
 class MeiTuZZ(robot.Robot):
@@ -57,22 +71,28 @@ class MeiTuZZ(robot.Robot):
                     album_id += 1
                     continue
 
-            total_photo_count_find = re.findall('<span id="photoNumTotal">(\d*)</span>', album_page)
-            if len(total_photo_count_find) != 1:
+            total_photo_count = tool.find_sub_string(album_page, '<input type="hidden" id="totalPageNum" value=', ' />')
+            if not total_photo_count:
                 log.error("第%s页图片数量解析失败" % album_id)
                 break
+            total_photo_count = int(total_photo_count)
 
-            image_url_list = re.findall('data-src="([^"]*)"', album_page)
-            if len(image_url_list) == 0:
+            # 获取页面全部图片地址列表
+            image_url_list = get_image_url_list(album_page)
+            if image_url_list is None:
                 log.error("第%s页图片地址列表解析失败" % album_id)
                 break
 
+            if len(image_url_list) == 0:
+                log.error("第%s页没有获取到图片" % album_id)
+                break
+
             is_fee = False
-            if len(image_url_list) != int(total_photo_count_find[0]):
+            if len(image_url_list) != total_photo_count:
                 album_reward_find = re.findall('<input type="hidden" id="rewardAmount" value="(\d*)">', album_page)
                 if len(album_reward_find) == 1:
                     album_reward = int(album_reward_find[0])
-                    if album_reward > 0 and int(total_photo_count_find[0]) - len(image_url_list) <= 1:
+                    if album_reward > 0 and total_photo_count - len(image_url_list) <= 1:
                         is_fee = True
                 if not is_fee:
                     log.error("第%s页解析获取的图片数量不符" % album_id)
@@ -89,7 +109,7 @@ class MeiTuZZ(robot.Robot):
             image_count = 1
             for image_url in image_url_list:
                 # 去除模糊效果
-                image_url = image_url.split("@")[0]
+                image_url = str(image_url).split("@")[0]
                 log.step("开始下载第%s页第%s张图片 %s" % (album_id, image_count, image_url))
 
                 file_path = os.path.join(image_path, "%04d.jpg" % image_count)
@@ -107,8 +127,8 @@ class MeiTuZZ(robot.Robot):
 
             if not is_over:
                 # 添加到收费数组
-                if is_fee:
-                    fee_album_list.append(str(album_id))
+                # if is_fee:
+                #     fee_album_list.append(str(album_id))
                 total_image_count += image_count - 1
                 album_id += 1
 
