@@ -37,9 +37,9 @@ def get_site_id(account_name):
 # account_name -> deer-vision
 # account_id -> 1186455
 # post_time -> 2016-11-11 11:11:11
-def get_one_page_post_info_list(account_name, site_id, post_time):
+def get_one_page_post_info_list(site_id, post_time):
     # https://deer-vision.tuchong.com/rest/sites/1186455/posts/2016-11-11%2011:11:11?limit=20
-    post_page_url = "https://%s.tuchong.com/rest/sites/%s/posts/" % (account_name, site_id)
+    post_page_url = "https://www.tuchong.com/rest/sites/%s/posts/" % site_id
     post_page_url += "%s?limit=%s" % (post_time, IMAGE_COUNT_PER_PAGE)
     post_page_return_code, post_page_data = tool.http_request(post_page_url)[:2]
     if post_page_return_code == 1:
@@ -146,14 +146,10 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
+            if account_name.isdigit():
+                site_id = account_name
             else:
-                image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-
-            # 图片
-            site_id = get_site_id(account_name)
+                site_id = get_site_id(account_name)
             if site_id is None:
                 log.error(account_name + " 主页无法访问")
                 tool.process_exit()
@@ -162,6 +158,8 @@ class Download(threading.Thread):
                 log.error(account_name + " site id解析失败")
                 tool.process_exit()
 
+            image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
+
             this_account_total_image_count = 0
             post_count = 0
             first_post_id = "0"
@@ -169,7 +167,7 @@ class Download(threading.Thread):
             is_over = False
             while not is_over:
                 # 获取一页的相册信息列表
-                post_info_list = get_one_page_post_info_list(account_name, site_id, post_time)
+                post_info_list = get_one_page_post_info_list(site_id, post_time)
                 if post_info_list is None:
                     log.error(account_name + " 相册信息列表无法访问")
                     tool.process_exit()
