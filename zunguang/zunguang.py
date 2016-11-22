@@ -1,7 +1,7 @@
 # -*- coding:UTF-8  -*-
 """
-美图赚赚图片爬虫
-http://meituzz.com/
+尊光图片爬虫
+http://zunguang.com/
 @author: hikaru
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
@@ -93,10 +93,8 @@ class ZunGuang(robot.Robot):
             # 下载目录标题
             title = ""
             if album_data["title"]:
-                title = str(album_data["title"].encode("utf-8"))
-                for filter_char in ["\\", "/", ":", "*", "?", '"', "<", ">", "|"]:
-                    title = title.replace(filter_char, " ")  # 过滤一些windows文件名屏蔽的字符
-                title = title.strip().rstrip(".")  # 去除前后空格以及后缀的
+                # 过滤标题中不支持的字符
+                title = robot.filter_text(str(album_data["title"].encode("utf-8")))
             if title:
                 image_path = os.path.join(self.image_download_path, "%04d %s" % (page_count, title))
             else:
