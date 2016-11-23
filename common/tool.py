@@ -50,11 +50,17 @@ def http_request(url, post_data=None, header_list=None, cookie=None):
                 request = urllib2.Request(url, post_data)
             else:
                 request = urllib2.Request(url)
-            # 设置头信息
+
+            # 设置User-Agent
             request.add_header("User-Agent", random_user_agent())
             if isinstance(header_list, dict):
                 for header_name, header_value in header_list.iteritems():
                     request.add_header(header_name, header_value)
+
+            # 设置一个随机IP
+            random_ip = random_ip_address()
+            request.add_header("X-Forwarded-For", random_ip)
+            request.add_header("x-Real-Ip", random_ip)
 
             # cookies
             if isinstance(cookie, cookielib.CookieJar):
@@ -73,7 +79,7 @@ def http_request(url, post_data=None, header_list=None, cookie=None):
             if response:
                 return 1, response.read(), response
         except Exception, e:
-            # 代理无法访问
+            # Connection refused（代理无法访问）
             if str(e).find("[Errno 10061]") != -1:
                 # 判断是否设置了代理
                 if urllib2._opener.handlers is not None:
@@ -85,13 +91,15 @@ def http_request(url, post_data=None, header_list=None, cookie=None):
                             elif input_str in ["n", "no"]:
                                 sys.exit()
                             break
-            # 连接被关闭，等待30秒后再尝试
-            elif str(e).find("[Errno 10053] ") != -1:
+            # 10053 Software caused connection abort
+            # 10054 Connection reset by peer
+            elif str(e).find("[Errno 10053] ") != -1 or str(e).find("[Errno 10054] ") != -1:
                 print_msg("访问页面超时，重新连接请稍后")
                 time.sleep(30)
             # 超时
             elif str(e).find("timed out") != -1:
                 print_msg("访问页面超时，重新连接请稍后")
+                time.sleep(10)
             # 400
             elif str(e).lower().find("http error 400") != -1:
                 return -400, None, None
@@ -133,6 +141,11 @@ def random_user_agent():
         return "Mozilla/5.0 (Windows NT %s; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s.%s Safari/537.36" \
                % (os_type, chrome_version, sub_version)
     return ""
+
+
+# 生成一个随机的IP地址
+def random_ip_address():
+    return "%s.%s.%s.%s" % (random.randint(1, 254), random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
 
 # 获取请求response中的指定信息
