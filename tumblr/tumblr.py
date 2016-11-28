@@ -225,6 +225,7 @@ class Download(threading.Thread):
                 log.trace(account_id + " 相册第%s页获取的所有信息页：%s" % (page_count, post_url_list))
                 post_url_list_group_by_post_id = filter_post_url(post_url_list)
                 log.trace(account_id + " 相册第%s页去重排序后的信息页：%s" % (page_count, post_url_list_group_by_post_id))
+                log.step(account_id + " 相册第%s页获取到%s页信息页" % (page_count, len(post_url_list_group_by_post_id)))
                 for post_id in sorted(post_url_list_group_by_post_id.keys(), reverse=True):
                     # 检查信息页id是否小于上次的记录
                     if post_id <= self.account_info[3]:
@@ -251,9 +252,17 @@ class Download(threading.Thread):
                         log.error(account_id + " 信息页 %s，'og:type'获取异常" % post_url)
                         continue
 
-                    # 空
-                    if og_type == "tumblr-feed:entry":
-                        continue
+                    # # 空
+                    # if og_type == "tumblr-feed:entry":
+                    #     continue
+                    #
+                    # # 音频
+                    # if og_type == "tumblr-feed:audio":
+                    #     continue
+                    #
+                    # # 引用
+                    # if og_type == "tumblr-feed:quote":
+                    #     continue
 
                     # 新增信息页导致的重复判断
                     if post_id in unique_list:
@@ -290,7 +299,14 @@ class Download(threading.Thread):
 
                     # 图片下载
                     if IS_DOWNLOAD_IMAGE:
-                        page_image_url_list = re.findall('"(http[s]?://\w*[.]?media.tumblr.com/[^"]*)"', post_page_head)
+                        if og_type == "tumblr-feed:video":
+                            page_image_url_list = []
+                            video_image_url = tool.find_sub_string(post_page_head, '<meta property="og:image" content="', '" />')
+                            if video_image_url:
+                                page_image_url_list.append(page_image_url_list)
+                        else:
+                            page_image_url_list = re.findall('"(http[s]?://\w*[.]?media.tumblr.com/[^"]*)"', post_page_head)
+
                         log.trace(account_id + " 信息页 %s 获取的所有图片：%s" % (post_url, page_image_url_list))
                         # 过滤头像以及页面上找到不同分辨率的同一张图
                         page_image_url_list = filter_different_resolution_images(page_image_url_list)
