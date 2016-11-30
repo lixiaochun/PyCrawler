@@ -30,17 +30,6 @@ IS_DOWNLOAD_IMAGE = True
 IS_DOWNLOAD_VIDEO = True
 
 
-# 获取当前cookies对应的authenticity_token
-def get_authenticity_token():
-    index_url = "https://twitter.com"
-    index_return_code, index_page = tool.http_request(index_url)[:2]
-    if index_return_code:
-        authenticity_token = tool.find_sub_string(index_page, 'value="', '" name="authenticity_token"')
-        if authenticity_token:
-            return authenticity_token
-    return None
-
-
 # 根据账号名字获得账号id（字母账号->数字账号)
 def get_account_id(account_name):
     account_index_url = "https://twitter.com/%s" % account_name
@@ -52,34 +41,45 @@ def get_account_id(account_name):
     return None
 
 
-# 关注指定账号（无效）
-def follow_account(authenticity_token, account_id):
+# 关注指定账号
+def follow_account(auth_token, account_id):
     follow_url = "https://twitter.com/i/user/follow"
-    follow_data = {"authenticity_token": authenticity_token, "challenges_passed": False, "handles_challenges": 1,
-                   "user_id": account_id}
-    follow_return_code, follow_data = tool.http_request(follow_url, follow_data)[:2]
+    follow_data = {"user_id": account_id}
+    header_list = {"Cookie": 'auth_token=%s;' % auth_token, "Referer": "https://twitter.com/"}
+    follow_return_code, follow_data = tool.http_request(follow_url, follow_data, header_list)[:2]
     if follow_return_code == 1:
-        return True
+        try:
+            follow_data = json.loads(follow_data)
+        except ValueError:
+            pass
+        else:
+            if robot.check_sub_key(("new_state",), follow_data) and follow_data["new_state"] == "following":
+                return True
     return False
 
 
-# 取消关注指定账号（无效）
-def unfollow_account(authenticity_token, account_id):
-    unfollow_url = "https://twitter.com/i/user/follow"
-    unfollow_data = {"authenticity_token": authenticity_token, "challenges_passed": False, "handles_challenges": 1,
-                     "user_id": account_id}
-    unfollow_return_code, unfollow_data = tool.http_request(unfollow_url, unfollow_data)[:2]
+# 取消关注指定账号
+def unfollow_account(auth_token, account_id):
+    unfollow_url = "https://twitter.com/i/user/unfollow"
+    unfollow_data = {"user_id": account_id}
+    header_list = {"Cookie": 'auth_token=%s;' % auth_token, "Referer": "https://twitter.com/"}
+    unfollow_return_code, unfollow_data = tool.http_request(unfollow_url, unfollow_data, header_list)[:2]
     if unfollow_return_code == 1:
-        return True
+        if robot.check_sub_key(("new_state",), unfollow_data) and unfollow_data["new_state"] == "not-following":
+            return True
     return False
 
 
-# 获取指定账号的全部关注列表（需要登录）
+# 获取指定账号的全部关注列表（需要登录并设置浏览器类型）
 def get_follow_list(account_name):
     position_id = "2000000000000000000"
     follow_list = []
+    # 从cookies中获取auth_token
+    auth_token = get_auth_token()
+    if auth_token is None:
+        return None
     while True:
-        follow_page_data = get_follow_page_data(account_name, position_id)
+        follow_page_data = get_follow_page_data(account_name, auth_token, position_id)
         if follow_page_data is not None:
             profile_list = re.findall('<div class="ProfileCard[^>]*data-screen-name="([^"]*)"[^>]*>', follow_page_data["items_html"])
             if len(profile_list) > 0:
@@ -93,10 +93,28 @@ def get_follow_list(account_name):
     return follow_list
 
 
+# 从cookie中获取auth_token
+def get_auth_token():
+    from common import robot
+    config = robot.read_config(os.path.join(os.getcwd(), "..\\common\\config.ini"))
+    # 操作系统&浏览器
+    browser_type = robot.get_config(config, "BROWSER_TYPE", 2, 1)
+    # cookie
+    is_auto_get_cookie = robot.get_config(config, "IS_AUTO_GET_COOKIE", True, 4)
+    if is_auto_get_cookie:
+        cookie_path = robot.tool.get_default_browser_cookie_path(browser_type)
+    else:
+        cookie_path = robot.get_config(config, "COOKIE_PATH", "", 0)
+    return tool.get_cookie_value_from_browser("auth_token", cookie_path, browser_type, (".twitter.com",))
+
+
 # 获取指定一页的关注列表
-def get_follow_page_data(account_name, position_id):
+def get_follow_page_data(account_name, auth_token, position_id):
     follow_list_url = "https://twitter.com/%s/following/users?max_position=%s" % (account_name, position_id)
-    follow_list_return_code, follow_list_data = tool.http_request(follow_list_url)[:2]
+    header_list = {
+        "Cookie": 'auth_token=%s;' % auth_token,
+    }
+    follow_list_return_code, follow_list_data = tool.http_request(follow_list_url, None, header_list)[:2]
     if follow_list_return_code == 1:
         try:
             follow_list_data = json.loads(follow_list_data)

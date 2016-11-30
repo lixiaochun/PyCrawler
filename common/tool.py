@@ -197,7 +197,7 @@ def create_cookie(name, value, domain="", path="/"):
 # browser_type=1: IE
 # browser_type=2: firefox
 # browser_type=3: chrome
-def set_cookie_from_browser(file_path, browser_type=1, target_domains=""):
+def set_cookie_from_browser(file_path, browser_type, target_domains=""):
     # 有些DB文件开启了WAL功能（SQL3.7引入，Python2.7的sqlite3的版本是3.6，所以需要pysqlite2.8）
     # import sqlite3
     from pysqlite2 import dbapi2 as sqlite
@@ -280,6 +280,61 @@ def set_cookie_from_browser(file_path, browser_type=1, target_domains=""):
     return True
 
 
+# 从浏览器保存的cookies中获取指定key的cookie value
+def get_cookie_value_from_browser(cookie_key, file_path, browser_type, target_domains=""):
+    # 有些DB文件开启了WAL功能（SQL3.7引入，Python2.7的sqlite3的版本是3.6，所以需要pysqlite2.8）
+    # import sqlite3
+    from pysqlite2 import dbapi2 as sqlite
+    if not os.path.exists(file_path):
+        print_msg("cookie目录：" + file_path + " 不存在")
+        return None
+    if browser_type == 1:
+        for cookie_name in os.listdir(file_path):
+            if cookie_name.find(".txt") == -1:
+                continue
+            cookie_file = open(os.path.join(file_path, cookie_name), "r")
+            cookie_info = cookie_file.read()
+            cookie_file.close()
+            for cookies in cookie_info.split("*"):
+                cookie_list = cookies.strip("\n").split("\n")
+                if len(cookie_list) < 8:
+                    continue
+                domain = cookie_list[2].split("/")[0]
+                if _filter_domain(domain, target_domains):
+                    continue
+                if cookie_list[0] == cookie_key:
+                    return cookie_list[1]
+    elif browser_type == 2:
+        con = sqlite.connect(os.path.join(file_path, "cookies.sqlite"))
+        cur = con.cursor()
+        cur.execute("select host, path, isSecure, expiry, name, value from moz_cookies")
+        for cookie_info in cur.fetchall():
+            domain = cookie_info[0]
+            if _filter_domain(domain, target_domains):
+                continue
+            if cookie_info[4] == cookie_key:
+                return cookie_info[5]
+    elif browser_type == 3:
+        try:
+            import win32crypt
+        except:
+            return None
+        con = sqlite.connect(os.path.join(file_path, "Cookies"))
+        cur = con.cursor()
+        cur.execute("select host_key, path, secure, expires_utc, name, value, encrypted_value from cookies")
+        for cookie_info in cur.fetchall():
+            domain = cookie_info[0]
+            if _filter_domain(domain, target_domains):
+                continue
+            if cookie_info[4] == cookie_key:
+                try:
+                    value = win32crypt.CryptUnprotectData(cookie_info[6], None, None, None, 0)[1]
+                except:
+                    return None
+                return value
+    return None
+
+
 # 是否需要过滤这个域的cookie
 # return True - 过滤，不需要加载
 # return False - 不过滤，需要加载
@@ -314,12 +369,12 @@ def set_proxy(ip, port):
 
 
 # 快速设置cookie和代理
-# is_set_cookie     0:不设置, 1:设置
-# is_set_proxy      0:不设置, 1:设置
+# is_set_cookie True / False
+# is_set_proxy True / False
 def quickly_set(is_set_cookie, is_set_proxy):
     import robot
     config = robot.read_config(os.path.join(os.getcwd(), "..\\common\\config.ini"))
-    if is_set_cookie == 1:
+    if is_set_cookie:
         # 操作系统&浏览器
         browser_type = robot.get_config(config, "BROWSER_TYPE", 2, 1)
         # cookie
@@ -329,7 +384,7 @@ def quickly_set(is_set_cookie, is_set_proxy):
         else:
             cookie_path = robot.get_config(config, "COOKIE_PATH", "", 0)
         set_cookie_from_browser(cookie_path, browser_type)
-    if is_set_proxy == 1:
+    if is_set_proxy:
         proxy_ip = robot.get_config(config, "PROXY_IP", "127.0.0.1", 0)
         proxy_port = robot.get_config(config, "PROXY_PORT", "8087", 0)
         set_proxy(proxy_ip, proxy_port)
