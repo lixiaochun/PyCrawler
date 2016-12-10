@@ -23,7 +23,7 @@ import zipfile
 # 初始化操作
 IS_SET_TIMEOUT = False
 HTTP_CONNECTION_TIMEOUT = 10
-HTTP_REQUEST_RETRY_COUNT = 500
+HTTP_REQUEST_RETRY_COUNT = 100
 thread_lock = threading.Lock()
 if getattr(sys, "frozen", False):
     IS_EXECUTABLE = True
@@ -252,7 +252,7 @@ def set_cookie_from_browser(file_path, browser_type, target_domains=""):
     elif browser_type == 3:
         try:
             import win32crypt
-        except:
+        except ImportError:
             return False
         con = sqlite.connect(os.path.join(file_path, "Cookies"))
         cur = con.cursor()
