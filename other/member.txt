@@ -94,7 +94,9 @@
 服部有菜	Hattori Yuna	AKB48 Team 8
 野田陽菜乃	Noda Hinano	AKB48 Team 8
 橋本陽菜	Hashimoto Haruna	AKB48 Team 8
+平野ひかる	Hirano Hikaru	AKB48 Team 8
 長久玲奈	Cho Kurena	AKB48 Team 8
+髙橋彩香	Takahashi Sayaka	AKB48 Team 8
 永野芹佳	Nagano Serika	AKB48 Team 8
 太田奈緒	Ota Nao	AKB48 Team 8
 山田菜々美	Yamada Nanami	AKB48 Team A / AKB48 Team 8
@@ -123,6 +125,7 @@
 石田安奈	Ishida Anna	SKE48 Team KII
 内山命	Uchiyama Mikoto	SKE48 Team KII
 江籠裕奈	Ego Yuna	SKE48 Team KII
+太田彩夏	Ota Ayaka	SKE48 Team KII
 大場美奈	Oba Mina	SKE48 Team KII
 小畑優奈	Obata Yuna	SKE48 Team KII
 北野瑠華	Kitano Ruka	SKE48 Team KII
@@ -135,18 +138,31 @@
 日高優月	Hidaka Yuzuki	SKE48 Team KII
 古畑奈和	Furuhata Nao	SKE48 Team KII
 松村香織	Matsumura Kaori	SKE48 Team KII
+水野愛理	Mizuno Airi	SKE48 Team KII
 相川暖花	Aikawa Honoka	SKE48 Team Kenkyusei
-浅井裕華	Asai Yuka	SKE48 Team Kenkyusei
-太田彩夏	Ota Ayaka	SKE48 Team Kenkyusei
 片岡成美	Kataoka Narumi	SKE48 Team Kenkyusei
 川崎成美	Kawasaki Narumi	SKE48 Team Kenkyusei
-末永桜花	Suenaga Oka	SKE48 Team Kenkyusei
-髙畑結希	Takahata Yuki	SKE48 Team Kenkyusei
-町音葉	Machi Otoha	SKE48 Team Kenkyusei
 和田愛菜	Wada Aina	SKE48 Team Kenkyusei
-一色嶺奈	Isshiki Rena	SKE48 Team Kenkyusei
-上村亜柚香	Kamimura Ayuka	SKE48 Team Kenkyusei
-水野愛理	Mizuno Airi	SKE48 Team Kenkyusei
+渥美彩羽	Atsumi Ayaha	SKE48 Team Kenkyusei
+石川咲姫	Ishikawa Saki	SKE48 Team Kenkyusei
+石黒友月	Ishiguro Yuzuki	SKE48 Team Kenkyusei
+井上瑠夏	Inoue Ruka	SKE48 Team Kenkyusei
+大芝りんか	Oshiba Rinka	SKE48 Team Kenkyusei
+岡田美紅	Okada Miku	SKE48 Team Kenkyusei
+川合杏奈	Kawai Anna	SKE48 Team Kenkyusei
+北川愛乃	Kitagawa Yoshino	SKE48 Team Kenkyusei
+倉島杏実	Kurashima Ami	SKE48 Team Kenkyusei
+小林佳乃	Kobayashi Kano	SKE48 Team Kenkyusei
+坂本真凛	Sakamoto Marin	SKE48 Team Kenkyusei
+佐藤佳穂	Sato Kaho	SKE48 Team Kenkyusei
+白雪希明	Shirayuki Kohaku	SKE48 Team Kenkyusei
+仲村和泉	Nakamura Izumi	SKE48 Team Kenkyusei
+野々垣美希	Nonogaki Miki	SKE48 Team Kenkyusei
+野村実代	Nomura Miyo	SKE48 Team Kenkyusei
+深井ねがい	Fukai Negai	SKE48 Team Kenkyusei
+森平莉子	Morihira Riko	SKE48 Team Kenkyusei
+矢作有紀奈	Yahagi Yukina	SKE48 Team Kenkyusei
+浅井裕華	Asai Yuka	SKE48 Team E
 井田玲音名	Ida Reona	SKE48 Team E
 市野成美	Ichino Narumi	SKE48 Team E
 鎌田菜月	Kamata Natsuki	SKE48 Team E
@@ -156,14 +172,18 @@
 斉藤真木子	Saito Makiko	SKE48 Team E
 酒井萌衣	Sakai Mei	SKE48 Team E
 佐藤すみれ	Sato Sumire	SKE48 Team E
+末永桜花	Suenaga Oka	SKE48 Team E
 菅原茉椰	Sugawara Maya	SKE48 Team E
 須田亜香里	Suda Akari	SKE48 Team E
 髙寺沙菜	Takatera Sana	SKE48 Team E
+髙畑結希	Takahata Yuki	SKE48 Team E
 谷真理佳	Tani Marika	SKE48 Team E
 福士奈央	Fukushi Nao	SKE48 Team E
 東李苑	Azuma Rion	SKE48 Team S
+一色嶺奈	Isshiki Rena	SKE48 Team S
 犬塚あさな	Inuzuka Asana	SKE48 Team S
 大矢真那	Oya Masana	SKE48 Team S
+上村亜柚香	Kamimura Ayuka	SKE48 Team S
 北川綾巴	Kitagawa Ryoha	SKE48 Team S / AKB48 Team 4
 後藤理沙子	Goto Risako	SKE48 Team S
 杉山愛佳	Sugiyama Aika	SKE48 Team S
@@ -172,6 +192,7 @@
 野口由芽	Noguchi Yume	SKE48 Team S
 野島樺乃	Nojima Kano	SKE48 Team S
 二村春香	Futamura Haruka	SKE48 Team S
+町音葉	Machi Otoha	SKE48 Team S
 松井珠理奈	Matsui Jurina	SKE48 Team S
 松本慈子	Matsumoto Chikako	SKE48 Team S
 矢方美紀	Yakata Miki	SKE48 Team S
@@ -289,75 +310,74 @@
 豊永阿紀	Toyonaga Aki	研究生
 松本日向	Matsumoto Hinata	研究生
 宮崎想乃	Miyazaki Sono	研究生
-Ayana Shahab	Ayana Shahab	JKT48 Team J
-Beby Chaesara Anadila	Beby Chaesara Anadila	JKT48 Team J
+Della Delila	Della Delila	JKT48 Team J
 Dena Siti Rohyati	Dena Siti Rohyati	JKT48 Team J
-Frieska Anastasia Laksani	Frieska Anastasia Laksani	JKT48 Team J
+Devi Kinal Putri	Devi Kinal Putri	JKT48 Team J
+Dwi Putri Bonita	Dwi Putri Bonita	JKT48 Team J
+Feni Fitriyanti	Feni Fitriyanti	JKT48 Team J
 Gabriela Margareth Warouw	Gabriela Margareth Warouw	JKT48 Team J
-Ghaida Farisya	Ghaida Farisya	JKT48 Team J
-Jennifer Rachel Natasya	Jennifer Rachel Natasya	JKT48 Team J
+Haruka Nakagawa	Haruka Nakagawa	JKT48 Team J
 Jessica Vania	Jessica Vania	JKT48 Team J
 Jessica Veranda	Jessica Veranda	JKT48 Team J
 Melody Nurramdhani Laksani	Melody Nurramdhani Laksani	JKT48 Team J
+Michelle Christo Kusnadi	Michelle Christo Kusnadi	JKT48 Team J
 Nabilah Ratna Ayu Azalia	Nabilah Ratna Ayu Azalia	JKT48 Team J
-Sendy Ariani	Sendy Ariani	JKT48 Team J
+Nadhifa Salsabila	Nadhifa Salsabila	JKT48 Team J
+Priscillia Sari Dewi	Priscillia Sari Dewi	JKT48 Team J
+Riskha Fairunissa	Riskha Fairunissa	JKT48 Team J
+Saktia Oktapyani	Saktia Oktapyani	JKT48 Team J
 Shania Junianatha	Shania Junianatha	JKT48 Team J
-Shinta Naomi	Shinta Naomi	JKT48 Team J
-Sonia Natalia	Sonia Natalia	JKT48 Team J
+Sinka Juliani	Sinka Juliani	JKT48 Team J
+Syahfira Angela Nurhaliza	Syahfira Angela Nurhaliza	JKT48 Team J
 Thalia Ivanka Elizabeth	Thalia Ivanka Elizabeth	JKT48 Team J
+Viviyona Apriani	Viviyona Apriani	JKT48 Team J
+Yansen Indiani	Yansen Indiani	JKT48 Team J
 Alicia Chanzia	Alicia Chanzia	JKT48 Team KIII
+Amanda Dwi Arista	Amanda Dwi Arista	JKT48 Team KIII
+Aninditha Rahma Cahyadi	Aninditha Rahma Cahyadi	JKT48 Team KIII
+Ayana Shahab	Ayana Shahab	JKT48 Team KIII
+Ayu Safira Oktaviani	Ayu Safira Oktaviani	JKT48 Team KIII
+Beby Chaesara Anadila	Beby Chaesara Anadila	JKT48 Team KIII
 Cindy Yuvia	Cindy Yuvia	JKT48 Team KIII
-Della Delila	Della Delila	JKT48 Team KIII
-Devi Kinal Putri	Devi Kinal Putri	JKT48 Team KIII
-Dwi Putri Bonita	Dwi Putri Bonita	JKT48 Team KIII
 Fakhriyani Shafariyanti	Fakhriyani Shafariyanti	JKT48 Team KIII
+Fransisca Saraswati Puspa Dewi	Fransisca Saraswati Puspa Dewi	JKT48 Team KIII
+Frieska Anastasia Laksani	Frieska Anastasia Laksani	JKT48 Team KIII
+Jennifer Rachel Natasya	Jennifer Rachel Natasya	JKT48 Team KIII
 Lidya Maulida Djuhandar	Lidya Maulida Djuhandar	JKT48 Team KIII
+Maria Genoveva Natalia Desy Purnamasari Gunawan	Maria Genoveva Natalia Desy Purnamasari Gunawan	JKT48 Team KIII
 Nadila Cindi Wantari	Nadila Cindi Wantari	JKT48 Team KIII
 Natalia	Natalia	JKT48 Team KIII
-Priscillia Sari Dewi	Priscillia Sari Dewi	JKT48 Team KIII
+Ni Made Ayu Vania Aurellia	Ni Made Ayu Vania Aurellia	JKT48 Team KIII
 Ratu Vienny Fitrilya	Ratu Vienny Fitrilya	JKT48 Team KIII
 Rina Chikano	Rina Chikano	JKT48 Team KIII
-Riskha Fairunissa	Riskha Fairunissa	JKT48 Team KIII
 Rona Anggreani	Rona Anggreani	JKT48 Team KIII
-Saktia Oktapyani	Saktia Oktapyani	JKT48 Team KIII
-Sinka Juliani	Sinka Juliani	JKT48 Team KIII
-Viviyona Apriani	Viviyona Apriani	JKT48 Team KIII
-Amanda Dwi Arista	Amanda Dwi Arista	JKT48 Team T
-Aninditha Rahma Cahyadi	Aninditha Rahma Cahyadi	JKT48 Team T
-Ayu Safira Oktaviani	Ayu Safira Oktaviani	JKT48 Team T
-Feni Fitriyanti	Feni Fitriyanti	JKT48 Team T
-Fransisca Saraswati Puspa Dewi	Fransisca Saraswati Puspa Dewi	JKT48 Team T
-Haruka Nakagawa	Haruka Nakagawa	JKT48 Team T
-Maria Genoveva Natalia Desy Purnamasari Gunawan	Maria Genoveva Natalia Desy Purnamasari Gunawan	JKT48 Team T
-Michelle Christo Kusnadi	Michelle Christo Kusnadi	JKT48 Team T
-Nadhifa Salsabila	Nadhifa Salsabila	JKT48 Team T
-Ni Made Ayu Vania Aurellia	Ni Made Ayu Vania Aurellia	JKT48 Team T
-Shani Indira Natio	Shani Indira Natio	JKT48 Team T
-Shania Gracia	Shania Gracia	JKT48 Team T
-Stephanie Pricilla Indarto Putri	Stephanie Pricilla Indarto Putri	JKT48 Team T
-Syahfira Angela Nurhaliza	Syahfira Angela Nurhaliza	JKT48 Team T
-Yansen Indiani	Yansen Indiani	JKT48 Team T
-Adriani Elisabeth	Adriani Elisabeth	JKT48 Team kenkyusei
-Christi	Christi	JKT48 Team kenkyusei
-Cindy Hapsari Maharani Pujiantoro Putri	Cindy Hapsari Maharani Pujiantoro Putri	JKT48 Team kenkyusei
-Fidly Immanda Azzahra	Fidly Immanda Azzahra	JKT48 Team kenkyusei
-Jinan Safa Safira	Jinan Safa Safira	JKT48 Team kenkyusei
-Made Devi Ranita Ningtara	Made Devi Ranita Ningtara	JKT48 Team kenkyusei
-Melati Putri Rahel Sesilia	Melati Putri Rahel Sesilia	JKT48 Team kenkyusei
-Sri Lintang 	Sri Lintang 	JKT48 Team kenkyusei
-Tan Zhi Hui Celine	Tan Zhi Hui Celine	JKT48 Team kenkyusei
-Zahra Yuriva Dermawan	Zahra Yuriva Dermawan	JKT48 Team kenkyusei
-Adhisty Zara	Adhisty Zara	JKT48 Team kenkyusei
+Shani Indira Natio	Shani Indira Natio	JKT48 Team KIII
+Shania Gracia	Shania Gracia	JKT48 Team KIII
+Shinta Naomi	Shinta Naomi	JKT48 Team KIII
+Sonia Natalia	Sonia Natalia	JKT48 Team KIII
+Stephanie Pricilla Indarto Putri	Stephanie Pricilla Indarto Putri	JKT48 Team KIII
+Adhisty Zara	Adhisty Zara	JKT48 Team T
+Adriani Elisabeth	Adriani Elisabeth	JKT48 Team T
+Christi	Christi	JKT48 Team T
+Cindy Hapsari Maharani Pujiantoro Putri	Cindy Hapsari Maharani Pujiantoro Putri	JKT48 Team T
+Elizabeth Gloria Setiawan	Elizabeth Gloria Setiawan	JKT48 Team T
+Eve Antoinette Ichwan	Eve Antoinette Ichwan	JKT48 Team T
+Fidly Immanda Azzahra	Fidly Immanda Azzahra	JKT48 Team T
+Jinan Safa Safira	Jinan Safa Safira	JKT48 Team T
+Made Devi Ranita Ningtara	Made Devi Ranita Ningtara	JKT48 Team T
+Melati Putri Rahel Sesilia	Melati Putri Rahel Sesilia	JKT48 Team T
+Melody Nurramdhani Laksani	Melody Nurramdhani Laksani	JKT48 Team T
+Nurhayati	Nurhayati	JKT48 Team T
+Puti Nadhira Azalia	Puti Nadhira Azalia	JKT48 Team T
+Regina Angelina	Regina Angelina	JKT48 Team T
+Ruth Damayanti Sitanggang	Ruth Damayanti Sitanggang	JKT48 Team T
+Sri Lintang 	Sri Lintang 	JKT48 Team T
+Tan Zhi Hui Celine	Tan Zhi Hui Celine	JKT48 Team T
+Violeta Burhan	Violeta Burhan	JKT48 Team T
+Zahra Yuriva Dermawan	Zahra Yuriva Dermawan	JKT48 Team T
 Chintya Hanindhitakirana Wirawan	Chintya Hanindhitakirana Wirawan	JKT48 Team kenkyusei
 Citra Ayu Pranajaya Wibrado	Citra Ayu Pranajaya Wibrado	JKT48 Team kenkyusei
 Diani Amalia Ramadhani	Diani Amalia Ramadhani	JKT48 Team kenkyusei
-Elizabeth Gloria Setiawan	Elizabeth Gloria Setiawan	JKT48 Team kenkyusei
-Eve Antoinette Ichwan	Eve Antoinette Ichwan	JKT48 Team kenkyusei
 Gabryela Marcelina	Gabryela Marcelina	JKT48 Team kenkyusei
 Hasyakyla Utami Kusumawardhani	Hasyakyla Utami Kusumawardhani	JKT48 Team kenkyusei
-Nurhayati	Nurhayati	JKT48 Team kenkyusei
-Puti Nadhira Azalia	Puti Nadhira Azalia	JKT48 Team kenkyusei
-Regina Angelina	Regina Angelina	JKT48 Team kenkyusei
-Ruth Damayanti Sitanggang	Ruth Damayanti Sitanggang	JKT48 Team kenkyusei
 Sania Julia Montolalu	Sania Julia Montolalu	JKT48 Team kenkyusei
-Violeta Burhan	Violeta Burhan	JKT48 Team kenkyusei
