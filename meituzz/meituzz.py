@@ -16,7 +16,7 @@ ERROR_PAGE_COUNT_CHECK = 10
 
 # 根据页面内容获取图片下载地址列表
 def get_image_url_list(album_page):
-    image_url_list_find = tool.find_sub_string(album_page, '<input type="hidden" id="imageList" value=', " />")
+    image_url_list_find = tool.find_sub_string(album_page, '<input type="hidden" id="imageList" value=', " ")
     try:
         image_url_list_find = json.loads(image_url_list_find)
     except ValueError:
@@ -30,7 +30,10 @@ def get_image_url_list(album_page):
 # 根据页面内容获取视频下载地址
 def get_video_url(album_page):
     video_url = tool.find_sub_string(album_page, '<input type="hidden" id="VideoUrl" value="', '">')
-    return "http://t.xiutuzz.com%s" % video_url
+    if video_url[0] == "/":
+        return "http://t.xiutuzz.com%s" % video_url
+    else:
+        return video_url
 
 
 class MeiTuZZ(robot.Robot):
@@ -80,7 +83,7 @@ class MeiTuZZ(robot.Robot):
                     album_id -= error_count - 1
                     break
                 else:
-                    log.error("第%s页相册已被删除" % album_id)
+                    log.step("第%s页相册已被删除" % album_id)
                     album_id += 1
                     continue
             # 错误数量重置
@@ -88,7 +91,7 @@ class MeiTuZZ(robot.Robot):
 
             # 图片下载
             if self.is_download_image and album_page.find('<input type="hidden" id="imageList"') >= 0:
-                total_photo_count = tool.find_sub_string(album_page, '<input type="hidden" id="totalPageNum" value=', " />")
+                total_photo_count = tool.find_sub_string(album_page, '<input type="hidden" id="totalPageNum" value=', " ")
                 if not total_photo_count:
                     log.error("第%s页图片数量解析失败" % album_id)
                     break
