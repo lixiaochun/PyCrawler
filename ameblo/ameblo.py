@@ -33,17 +33,25 @@ def get_blog_page(account_name, page_count):
 
 
 # 根绝日志页面，获取日志总页数
-def get_max_page_count(page_data):
-    paging_data = tool.find_sub_string(page_data, '<div class="page topPaging">', "</div>")
-    if paging_data:
+def is_max_page_count(page_data, page_count):
+    # 有页数选择的页面样式
+    if page_data.find('<div class="page topPaging">') >= 0:
+        paging_data = tool.find_sub_string(page_data, '<div class="page topPaging">', "</div>")
         last_page = re.findall('/page-(\d*).html#main" class="lastPage"', paging_data)
         if len(last_page) == 1:
-            return int(last_page[0])
+            return int(last_page[0]) >= page_count
         page_count_find = re.findall('<a [^>]*?>(\d*)</a>', paging_data)
         if len(page_count_find) > 0:
             page_count_find = map(int, page_count_find)
-            return max(page_count_find)
-    return None
+            return max(page_count_find) >= page_count
+        return False
+    # 只有下一页和上一页按钮的样式
+    elif page_data.find('<a class="skinSimpleBtn pagingNext"') >= 0:
+        if page_data.find('<a class="skinSimpleBtn pagingNext"') >= 0:
+            return False
+        else:
+            return True
+    return False
 
 
 # 获取页面内容获取全部的日志id列表
@@ -57,7 +65,9 @@ def get_image_url_list(account_name, blog_id):
     blog_return_code, blog_page = tool.http_request(blog_url)[:2]
     if blog_return_code == 1:
         article_data = tool.find_sub_string(blog_page, '<div class="subContentsInner">', "<!--entryBottom-->", 1)
-        image_url_list_find = re.findall('<img [\S|\s]*?src="([^"]*)" [\S|\s]*?>', article_data)
+        if not article_data:
+            article_data = tool.find_sub_string(blog_page, '<div class="articleText">', "<!--entryBottom-->", 1)
+        image_url_list_find = re.findall('<img [\S|\s]*?src="(http[^"]*)" [\S|\s]*?>', article_data)
         image_url_list = []
         for image_url in image_url_list_find:
             # 过滤表情
@@ -71,12 +81,16 @@ def get_image_url_list(account_name, blog_id):
 # http://stat.ameba.jp/user_images/20110612/15/akihabara48/af/3e/j/t02200165_0800060011286009555.jpg
 # ->
 # http://stat.ameba.jp/user_images/20110612/15/akihabara48/af/3e/j/o0800060011286009555.jpg
+# http://stat.ameba.jp/user_images/4b/90/10112135346_s.jpg
+# ->
+# http://stat.ameba.jp/user_images/4b/90/10112135346.jpg
 def get_origin_image_url(image_url):
     # 过滤表情
-    if image_url.find("http://emoji.ameba.jp") == 0:
+    if image_url.find("http://emoji.ameba.jp") == 0 or image_url.find("http://i.yimg.jp/images/mail/emoji") == 0 or \
+            image_url.find("http://blog.ameba.jp/ucs/img/char") == 0:
         return ""
-    # 图片上传时的异常本地文件路径
-    elif image_url.find("file:///") == 0:
+    # 无效的地址
+    elif image_url.find("http://jp.mg2.mail.yahoo.co.jp/ya/download") == 0 or image_url[-9:] == "clear.gif":
         return ""
     # ameba上传图片
     elif image_url.find("http://stat.ameba.jp/user_images") == 0:
@@ -86,8 +100,13 @@ def get_origin_image_url(image_url):
         temp_list = image_url.split("/")
         image_name = temp_list[-1]
         if image_name[0] != "o":
+            # http://stat.ameba.jp/user_images/20110612/15/akihabara48/af/3e/j/t02200165_0800060011286009555.jpg
             if image_name[0] == "t" and image_name.find("_") > 0:
                 temp_list[-1] = "o" + image_name.split("_", 1)[1]
+                image_url = "/".join(temp_list)
+            # http://stat.ameba.jp/user_images/4b/90/10112135346_s.jpg
+            elif image_name.split(".")[0][-2:] == "_s":
+                temp_list[-1] = image_name.replace("_s", "")
                 image_url = "/".join(temp_list)
             else:
                 # todo 检测包含其他格式
@@ -263,11 +282,7 @@ class Download(threading.Thread):
                         is_over = True
                     else:
                         # 获取总页数
-                        max_page_count = get_max_page_count(page_data)
-                        if max_page_count is None:
-                            log.error(account_name + " 创建图片下载目录 %s 失败" % image_path)
-                            tool.process_exit()
-                        if page_count >= max_page_count:
+                        if is_max_page_count(page_data, page_count):
                             is_over = True
                         else:
                             page_count += 1
