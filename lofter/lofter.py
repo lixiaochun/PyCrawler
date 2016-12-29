@@ -136,10 +136,12 @@ class Download(threading.Thread):
             is_over = False
             need_make_download_dir = True
             while not is_over:
+                log.step(account_id + " 开始解析第%s页日志" % page_count)
+
                 post_url_list = get_one_page_post_url_list(account_id, page_count)
                 # 无法获取信息首页
                 if post_url_list is None:
-                    log.error(account_id + " 无法访问第%s页相册页" % page_count)
+                    log.error(account_id + " 无法访问第%s页日志" % page_count)
                     tool.process_exit()
 
                 if len(post_url_list) == 0:
@@ -147,9 +149,10 @@ class Download(threading.Thread):
                     break
 
                 # 去重排序
-                log.trace(account_id + " 相册第%s页获取的所有信息页：%s" % (page_count, post_url_list))
+                log.trace(account_id + " 第%s页获取的所有日志页：%s" % (page_count, post_url_list))
                 post_url_list = sorted(list(set(post_url_list)), reverse=True)
-                log.trace(account_id + " 相册第%s页去重排序后的信息页：%s" % (page_count, post_url_list))
+                log.trace(account_id + " 第%s页去重排序后的日志：%s" % (page_count, post_url_list))
+
                 for post_url in post_url_list:
                     post_id = post_url.split("/")[-1].split("_")[-1]
 
@@ -158,25 +161,30 @@ class Download(threading.Thread):
                         is_over = True
                         break
 
+                    # 将第一个信息页的id做为新的存档记录
+                    if first_post_id == "":
+                        first_post_id = post_id
+
                     # 新增信息页导致的重复判断
                     if post_id in unique_list:
                         continue
                     else:
                         unique_list.append(post_id)
-                    # 将第一个信息页的id做为新的存档记录
-                    if first_post_id == "":
-                        first_post_id = post_id
+
+                    log.step(account_id + " 开始解析日志 %s" % post_url)
 
                     post_page_return_code, post_page = tool.http_request(post_url)[:2]
                     if post_page_return_code != 1:
-                        log.error(account_id + " 第%s张图片，无法获取信息页 %s" % (image_count, post_url))
+                        log.error(account_id + " 第%s张图片，无法访问日志 %s" % (image_count, post_url))
                         continue
 
+                    # 获取图片下载地址列表
                     image_url_list = get_image_url_list(post_page)
-                    log.trace(account_id + " 信息页 %s 获取的所有图片：%s" % (post_url, image_url_list))
                     if len(image_url_list) == 0:
-                        log.error(account_id + " 第%s张图片，信息页 %s 中没有找到图片" % (image_count, post_url))
+                        log.error(account_id + " 第%s张图片，日志 %s 中没有找到图片" % (image_count, post_url))
                         continue
+                    log.trace(account_id + " 日志 %s 获取的所有图片：%s" % (post_url, image_url_list))
+
                     for image_url in image_url_list:
                         if image_url.rfind("?") > image_url.rfind("."):
                             image_url = image_url.split("?")[0]
@@ -216,6 +224,7 @@ class Download(threading.Thread):
 
             # 排序
             if IS_SORT and image_count > 1:
+                log.step(account_id + " 图片开始从下载目录移动到保存目录")
                 destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_id)
                 if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
                     log.step(account_id + " 图片从下载目录移动到保存目录成功")

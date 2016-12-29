@@ -217,6 +217,8 @@ class Download(threading.Thread):
             is_over = False
             need_make_download_dir = True
             while suid != "" and (not is_over):
+                log.step(account_name + " 开始解析第%s页视频" % page_count)
+
                 # 获取指定一页的视频信息
                 media_page = get_one_page_video_data(suid, page_count)
                 if media_page is None:
@@ -229,6 +231,8 @@ class Download(threading.Thread):
                     log.error(account_name + " 在视频列表：%s 中没有找到视频scid" % str(media_page["msg"]))
                     tool.process_exit()
 
+                log.trace(account_name + " 第%s页获取的全部视频：%s" % (page_count, scid_list))
+
                 for scid in scid_list:
                     scid = str(scid)
 
@@ -237,21 +241,21 @@ class Download(threading.Thread):
                         is_over = True
                         break
 
+                    # 将第一个视频的id做为新的存档记录
+                    if first_video_scid == "":
+                        first_video_scid = scid
+
                     # 新增视频导致的重复判断
                     if scid in unique_list:
                         continue
                     else:
                         unique_list.append(scid)
-                    # 将第一个视频的id做为新的存档记录
-                    if first_video_scid == "":
-                        first_video_scid = scid
 
                     # 获取视频下载地址
                     video_url = get_video_url_by_video_id(scid)
                     if video_url is None:
                         log.error(account_name + " 第%s个视频 %s 获取下载地址失败" % (video_count, scid))
                         continue
-
                     log.step(account_name + " 开始下载第%s个视频 %s" % (video_count, video_url))
 
                     # 第一个视频，创建目录
@@ -283,6 +287,7 @@ class Download(threading.Thread):
 
             # 排序
             if IS_SORT and video_count > 1:
+                log.step(account_name + " 视频开始从下载目录移动到保存目录")
                 destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
                 if robot.sort_file(video_path, destination_path, int(self.account_info[1]), 4):
                     log.step(account_name + " 视频从下载目录移动到保存目录成功")

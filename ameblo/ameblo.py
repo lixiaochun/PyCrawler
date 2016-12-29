@@ -46,11 +46,11 @@ def is_max_page_count(page_data, page_count):
             return max(page_count_find) >= page_count
         return False
     # 只有下一页和上一页按钮的样式
-    elif page_data.find('<a class="skinSimpleBtn pagingNext"') >= 0:
-        if page_data.find('<a class="skinSimpleBtn pagingNext"') >= 0:
-            return False
-        else:
+    elif page_data.find('<a class="skinSimpleBtn pagingPrev"') >= 0:  # 有上一页按钮
+        if page_data.find('<a class="skinSimpleBtn pagingNext"') == -1:  # 但没有下一页按钮
             return True
+        else:
+            return False
     return False
 
 
@@ -225,6 +225,7 @@ class Download(threading.Thread):
 
                 # 获取一页所有日志id列表
                 blog_id_list = get_blog_id_list(page_data)
+                log.trace(account_name + " 第%s页获取的所有日志：%s" % (page_count, blog_id_list))
 
                 for blog_id in list(blog_id_list):
                     # 检查是否是上一次的最后blog
@@ -241,7 +242,7 @@ class Download(threading.Thread):
                     else:
                         unique_list.append(blog_id)
 
-                    log.step(account_name + " 开始解析日志：%s" % blog_id)
+                    log.step(account_name + " 开始解析日志%s" % blog_id)
 
                     # 从日志页面中获取全部的图片地址列表
                     image_url_list = get_image_url_list(account_name, blog_id)
@@ -292,6 +293,7 @@ class Download(threading.Thread):
             # 排序
             if IS_SORT and image_count > 1:
                 destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
+                log.step(account_name + " 图片开始从下载目录移动到保存目录")
                 if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
                     log.step(account_name + " 图片从下载目录移动到保存目录成功")
                 else:

@@ -346,6 +346,8 @@ class Download(threading.Thread):
                         log.error(account_name + " 微博主页没有获取到page_id")
                         break
 
+                log.step(account_name + " 开始解析%s后一页视频" % since_id)
+
                 # 获取指定时间点后的一页视频信息
                 video_page_data = get_one_page_video_data(account_page_id, since_id)
                 if video_page_data is None:
@@ -356,6 +358,7 @@ class Download(threading.Thread):
                 # 匹配获取全部的视频页面
                 video_play_url_list = get_video_play_url_list(video_page_data)
                 log.trace(account_name + "since_id：%s中的全部视频：%s" % (since_id, video_play_url_list))
+
                 for video_play_url in video_play_url_list:
                     # 检查是否是上一次的最后视频
                     if self.account_info[4] == video_play_url:
@@ -416,6 +419,8 @@ class Download(threading.Thread):
             is_over = False
             need_make_image_dir = True
             while IS_DOWNLOAD_IMAGE and (not is_over):
+                log.step(account_name + " 开始解析第%s页图片" % page_count)
+
                 # 获取指定一页图片的信息
                 photo_page_data = get_one_page_photo_data(account_id, page_count)
                 if photo_page_data is None:
@@ -423,7 +428,8 @@ class Download(threading.Thread):
                     first_image_time = "0"  # 存档恢复
                     break
 
-                log.trace(account_name + "第%s页的全部图片信息：%s" % (page_count, photo_page_data))
+                log.trace(account_name + "第%s页获取的全部图片信息：%s" % (page_count, photo_page_data))
+
                 for image_info in photo_page_data["photo_list"]:
                     if not robot.check_sub_key(("pic_host", "pic_name", "timestamp"), image_info):
                         log.error(account_name + " 第%s张图片信息解析失败 %s" % (image_count, image_info))
@@ -434,14 +440,15 @@ class Download(threading.Thread):
                         is_over = True
                         break
 
+                    # 将第一张图片的上传时间做为新的存档记录
+                    if first_image_time == "0":
+                        first_image_time = str(image_info["timestamp"])
+
                     # 新增图片导致的重复判断
                     if image_info["pic_name"] in unique_list:
                         continue
                     else:
                         unique_list.append(image_info["pic_name"])
-                    # 将第一张图片的上传时间做为新的存档记录
-                    if first_image_time == "0":
-                        first_image_time = str(image_info["timestamp"])
 
                     image_url = str(image_info["pic_host"]) + "/large/" + str(image_info["pic_name"])
                     log.step(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
@@ -487,14 +494,16 @@ class Download(threading.Thread):
 
             # 排序
             if IS_SORT:
-                if first_image_time != "0":
+                if image_count > 1:
+                    log.step(account_name + " 图片开始从下载目录移动到保存目录")
                     destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
                     if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
                         log.step(account_name + " 图片从下载目录移动到保存目录成功")
                     else:
                         log.error(account_name + " 创建图片保存目录 %s 失败" % destination_path)
                         tool.process_exit()
-                if first_video_url != "":
+                if video_count > 1:
+                    log.step(account_name + " 视频开始从下载目录移动到保存目录")
                     destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
                     if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
                         log.step(account_name + " 视频从下载目录移动到保存目录成功")

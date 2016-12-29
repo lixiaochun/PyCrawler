@@ -25,10 +25,10 @@ IS_SORT = True
 
 # 获取指定页数的日志页面
 def get_blog_page(account_name, page_count):
-    page_url = "http://ameblo.jp/%s/page-%s.html" % (account_name, page_count)
-    response = tool.http_request2(page_url)
-    if response.status == 200:
-        return response.data
+    index_page_url = "http://ameblo.jp/%s/page-%s.html" % (account_name, page_count)
+    index_page_response = tool.http_request2(index_page_url)
+    if index_page_response.status == 200:
+        return index_page_response.data
     return None
 
 
@@ -46,11 +46,11 @@ def is_max_page_count(page_data, page_count):
             return max(page_count_find) >= page_count
         return False
     # 只有下一页和上一页按钮的样式
-    elif page_data.find('<a class="skinSimpleBtn pagingNext"') >= 0:
-        if page_data.find('<a class="skinSimpleBtn pagingNext"') >= 0:
-            return False
-        else:
+    elif page_data.find('<a class="skinSimpleBtn pagingPrev"') >= 0:  # 有上一页按钮
+        if page_data.find('<a class="skinSimpleBtn pagingNext"') == -1:  # 但没有下一页按钮
             return True
+        else:
+            return False
     return False
 
 
@@ -62,9 +62,9 @@ def get_blog_id_list(page_data):
 # 从日志列表中获取全部的图片，并过滤掉表情
 def get_image_url_list(account_name, blog_id):
     blog_url = "http://ameblo.jp/%s/entry-%s.html" % (account_name, blog_id)
-    response = tool.http_request2(blog_url)
-    if response.status == 200:
-        blog_page = response.data
+    blog_page_response = tool.http_request2(blog_url)
+    if blog_page_response.status == 200:
+        blog_page = blog_page_response.data
         article_data = tool.find_sub_string(blog_page, '<div class="subContentsInner">', "<!--entryBottom-->", 1)
         if not article_data:
             article_data = tool.find_sub_string(blog_page, '<div class="articleText">', "<!--entryBottom-->", 1)
@@ -226,6 +226,8 @@ class Download(threading.Thread):
 
                 # 获取一页所有日志id列表
                 blog_id_list = get_blog_id_list(page_data)
+                log.trace(account_name + " 第%s页获取的所有日志：%s" % (page_count, blog_id_list))
+
                 for blog_id in list(blog_id_list):
                     # 检查是否是上一次的最后blog
                     if int(blog_id) <= int(self.account_info[2]):
@@ -241,7 +243,7 @@ class Download(threading.Thread):
                     else:
                         unique_list.append(blog_id)
 
-                    log.step(account_name + " 开始解析日志：%s" % blog_id)
+                    log.step(account_name + " 开始解析日志%s" % blog_id)
 
                     # 从日志页面中获取全部的图片地址列表
                     image_url_list = get_image_url_list(account_name, blog_id)
@@ -292,6 +294,7 @@ class Download(threading.Thread):
             # 排序
             if IS_SORT and image_count > 1:
                 destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
+                log.step(account_name + " 图片开始从下载目录移动到保存目录")
                 if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
                     log.step(account_name + " 图片从下载目录移动到保存目录成功")
                 else:

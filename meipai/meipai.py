@@ -166,11 +166,14 @@ class Download(threading.Thread):
             is_over = False
             need_make_download_dir = True
             while not is_over:
+                log.step(account_name + " 开始解析第%s页视频" % page_count)
+
                 # 获取指定一页的视频信息
                 medias_data = get_one_page_video_data(account_id, page_count)
                 if medias_data is None:
                     log.error(account_name + " 视频列表获取失败")
                     tool.process_exit()
+                log.trace(account_name + " 第%s页获取的全部视频：%s" % (page_count, medias_data))
 
                 for media in medias_data:
                     if not robot.check_sub_key(("video", "id"), media):
@@ -184,14 +187,15 @@ class Download(threading.Thread):
                         is_over = True
                         break
 
+                    # 将第一张图片的上传时间做为新的存档记录
+                    if first_video_id == "0":
+                        first_video_id = video_id
+
                     # 新增视频导致的重复判断
                     if video_id in unique_list:
                         continue
                     else:
                         unique_list.append(video_id)
-                    # 将第一张图片的上传时间做为新的存档记录
-                    if first_video_id == "0":
-                        first_video_id = video_id
 
                     video_url = str(media["video"])
                     log.step(account_name + " 开始下载第%s个视频 %s" % (video_count, video_url))
@@ -226,6 +230,7 @@ class Download(threading.Thread):
 
             # 排序
             if IS_SORT and video_count > 1:
+                log.step(account_name + " 视频开始从下载目录移动到保存目录")
                 destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
                 if robot.sort_file(video_path, destination_path, int(self.account_info[1]), 4):
                     log.step(account_name + " 视频从下载目录移动到保存目录成功")

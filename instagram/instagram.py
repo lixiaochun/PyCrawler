@@ -354,6 +354,8 @@ class Download(threading.Thread):
             need_make_image_dir = True
             need_make_video_dir = True
             while not is_over:
+                log.step(account_name + " 开始解析cursor %s的媒体信息" % cursor)
+
                 # 获取指定时间后的一页媒体信息
                 media_data = get_one_page_media_data(account_id, cursor)
                 if media_data is None:
@@ -361,6 +363,8 @@ class Download(threading.Thread):
                     tool.process_exit()
 
                 nodes_data = media_data["nodes"]
+                log.trace(account_name + " cursor %s获取的所有媒体信息：%s" % (cursor, nodes_data))
+
                 for photo_info in nodes_data:
                     if not robot.check_sub_key(("is_video", "display_src", "date"), photo_info):
                         log.error(account_name + " 媒体信息解析异常")
@@ -442,6 +446,7 @@ class Download(threading.Thread):
             # 排序
             if IS_SORT:
                 if image_count > 1:
+                    log.step(account_name + " 图片开始从下载目录移动到保存目录")
                     destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
                     if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
                         log.step(account_name + " 图片从下载目录移动到保存目录成功")
@@ -449,6 +454,7 @@ class Download(threading.Thread):
                         log.error(account_name + " 创建图片保存目录 %s 失败" % destination_path)
                         tool.process_exit()
                 if video_count > 1:
+                    log.step(account_name + " 视频开始从下载目录移动到保存目录")
                     destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
                     if robot.sort_file(video_path, destination_path, int(self.account_info[2]), 4):
                         log.step(account_name + " 视频从下载目录移动到保存目录成功")

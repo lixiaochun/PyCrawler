@@ -174,9 +174,10 @@ class Download(threading.Thread):
             is_over = False
             need_make_download_dir = True
             while not is_over:
+                log.step(account_name + " 开始解析第%s页歌曲" % page_count)
+
                 # 获取指定一页的歌曲信息
                 audio_list = get_one_page_audio_list(user_id, page_count)
-
                 if audio_list is None:
                     log.step(account_name + " 第%s页歌曲列表获取失败" % page_count)
                     first_audio_id = "0"
@@ -186,6 +187,8 @@ class Download(threading.Thread):
                 if len(audio_list) == 0:
                     break
 
+                log.trace(account_name + " 第%s页获取的所有歌曲：%s" % (page_count, audio_list))
+
                 for audio_info in list(audio_list):
                     audio_id = audio_info[0]
 
@@ -194,14 +197,15 @@ class Download(threading.Thread):
                         is_over = True
                         break
 
+                    # 将第一首歌曲id做为新的存档记录
+                    if first_audio_id == "0":
+                        first_audio_id = str(audio_id)
+
                     # 新增歌曲导致的重复判断
                     if audio_id in unique_list:
                         continue
                     else:
                         unique_list.append(audio_id)
-                    # 将第一首歌曲id做为新的存档记录
-                    if first_audio_id == "0":
-                        first_audio_id = str(audio_id)
 
                     # 获取歌曲的下载地址
                     audio_url = get_audio_url(audio_info[2])
