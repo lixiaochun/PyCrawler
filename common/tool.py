@@ -41,11 +41,10 @@ else:
 
 # http请求
 # header_list   http header信息，e.g. {"Host":“www.example.com"}
-# cookie        cookielib.CookieJar
 # is_random_ip  是否使用伪造IP
 # 返回 【返回码，数据, response】
 # 返回码 1：正常返回；-1：无法访问；-100：URL格式不正确；其他< 0：网页返回码
-def http_request(url, post_data=None, header_list=None, cookie=None, is_random_ip=True):
+def http_request(url, post_data=None, header_list=None, is_random_ip=True):
     if not (url.find("http://") == 0 or url.find("https://") == 0):
         return -100, None, None
     count = 0
@@ -76,11 +75,6 @@ def http_request(url, post_data=None, header_list=None, cookie=None, is_random_i
                 for header_name, header_value in header_list.iteritems():
                     request.add_header(header_name, header_value)
 
-            # cookies
-            if isinstance(cookie, cookielib.CookieJar):
-                opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
-                urllib2.install_opener(opener)
-
             # 设置访问超时
             response = urllib2.urlopen(request, timeout=HTTP_CONNECTION_TIMEOUT)
 
@@ -93,10 +87,11 @@ def http_request(url, post_data=None, header_list=None, cookie=None, is_random_i
                 if urllib2._opener.handlers is not None:
                     for handler in urllib2._opener.handlers:
                         if isinstance(handler, urllib2.ProxyHandler):
-                            input_str = raw_input("无法访问代理服务器，请检查代理设置。是否需要继续程序？(Y)es or (N)o：").lower()
-                            if input_str in ["y", "yes"]:
+                            notice = "无法访问代理服务器，请检查代理设置。检查完成后输入[(C)ontinue]继续程序或者[(S)top]退出程序："
+                            input_str = raw_input(notice).lower()
+                            if input_str in ["c", "continue"]:
                                 pass
-                            elif input_str in ["n", "no"]:
+                            elif input_str in ["s", "stop"]:
                                 sys.exit()
                             break
             # 10053 Software caused connection abort
@@ -694,13 +689,14 @@ def shutdown(delay_time=30):
 # 初始化urllib3的连接池
 def init_http_connection_pool():
     global HTTP_CONNECTION_POOL
-    HTTP_CONNECTION_POOL = urllib3.PoolManager()
+    HTTP_CONNECTION_POOL = urllib3.PoolManager(timeout=HTTP_CONNECTION_TIMEOUT, retries=False)
 
 
 # 设置代理，初始化带有代理的urllib3的连接池
 def set_proxy2(ip, port):
     global HTTP_CONNECTION_POOL
-    HTTP_CONNECTION_POOL = urllib3.ProxyManager("http://%s:%s" % (ip, port))
+    HTTP_CONNECTION_POOL = urllib3.ProxyManager("http://%s:%s" % (ip, port), timeout=HTTP_CONNECTION_TIMEOUT,
+                                                retries=False)
     print_msg("设置代理成功")
 
 
@@ -735,17 +731,26 @@ def http_request2(url, post_data=None, header_list=None, is_random_ip=True):
 
         try:
             if post_data:
-                response = HTTP_CONNECTION_POOL.request('POST', url, fields=post_data, headers=header_list,
-                                                        timeout=HTTP_CONNECTION_TIMEOUT)
+                response = HTTP_CONNECTION_POOL.request('POST', url, fields=post_data, headers=header_list)
             else:
-                response = HTTP_CONNECTION_POOL.request('GET', url, headers=header_list, timeout=HTTP_CONNECTION_TIMEOUT)
+                response = HTTP_CONNECTION_POOL.request('GET', url, headers=header_list)
             return response
+        except urllib3.exceptions.ProxyError:
+            notice = "无法访问代理服务器，请检查代理设置。检查完成后输入(C)ontinue继续程序或者(S)top退出程序："
+            input_str = raw_input(notice).lower()
+            if input_str in ["c", "continue"]:
+                pass
+            elif input_str in ["s", "stop"]:
+                sys.exit()
         except urllib3.exceptions.MaxRetryError, e:
             if str(e).find("Caused by ResponseError('too many redirects',)") >= 0:
                 return ErrorResponse(-1)
             else:
                 print_msg(url)
                 print_msg(str(e))
+        except urllib3.exceptions.ConnectTimeoutError, e:
+            print e
+            print_msg(url + " 访问超时，稍后重试")
         except Exception, e:
             print_msg(url)
             print_msg(str(e))
