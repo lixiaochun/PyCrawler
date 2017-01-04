@@ -697,14 +697,14 @@ def shutdown(delay_time=30):
 # 初始化urllib3的连接池
 def init_http_connection_pool():
     global HTTP_CONNECTION_POOL
-    HTTP_CONNECTION_POOL = urllib3.PoolManager(timeout=HTTP_CONNECTION_TIMEOUT, retries=False)
+    HTTP_CONNECTION_POOL = urllib3.PoolManager(retries=False, timeout=urllib3.Timeout(connect=HTTP_CONNECTION_TIMEOUT))
 
 
 # 设置代理，初始化带有代理的urllib3的连接池
 def set_proxy2(ip, port):
     global HTTP_CONNECTION_POOL
-    HTTP_CONNECTION_POOL = urllib3.ProxyManager("http://%s:%s" % (ip, port), timeout=HTTP_CONNECTION_TIMEOUT,
-                                                retries=False)
+    HTTP_CONNECTION_POOL = urllib3.ProxyManager("http://%s:%s" % (ip, port), retries=False,
+                                                timeout=urllib3.Timeout(connect=HTTP_CONNECTION_TIMEOUT))
     print_msg("设置代理成功")
 
 
@@ -759,6 +759,9 @@ def http_request2(url, post_data=None, header_list=None, is_random_ip=True):
         except urllib3.exceptions.ConnectTimeoutError, e:
             print e
             print_msg(url + " 访问超时，稍后重试")
+        except urllib3.exceptions.ProtocolError, e:
+            print e
+            print_msg(url + " 访问超时，稍后重试")
         except Exception, e:
             print_msg(url)
             print_msg(str(e))
@@ -775,6 +778,7 @@ class ErrorResponse(object):
     def __init__(self, status=-1):
         self.status = status
         self.data = None
+        self.headers = {}
 
 
 # 保存网络文件
