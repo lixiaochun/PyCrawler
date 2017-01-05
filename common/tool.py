@@ -13,6 +13,7 @@ import platform
 import random
 import shutil
 import sqlite3
+import ssl
 import sys
 import time
 import threading
@@ -30,7 +31,11 @@ elif sys.version_info >= (3,):
     raise Exception("仅支持python2.X，请访问官网 https://www.python.org/downloads/ 安装最新的python2")
 HTTP_CONNECTION_TIMEOUT = 10
 HTTP_REQUEST_RETRY_COUNT = 100
+# https://www.python.org/dev/peps/pep-0476/
+# disable urllib3 HTTPS warning
 urllib3.disable_warnings()
+# disable URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:590)>
+ssl._create_default_https_context = ssl._create_unverified_context
 HTTP_CONNECTION_POOL = None
 thread_lock = threading.Lock()
 if getattr(sys, "frozen", False):
@@ -98,12 +103,12 @@ def http_request(url, post_data=None, header_list=None, is_random_ip=True):
             # 10054 Connection reset by peer
             elif str(e).find("[Errno 10053] ") != -1 or str(e).find("[Errno 10054] ") != -1 or \
                     str(e).find("HTTP Error 502: Server dropped connection") != -1:
-                print_msg(e)
+                print_msg(str(e))
                 print_msg(url + " 访问超时，稍后重试")
                 time.sleep(30)
             # 超时
             elif str(e).find("timed out") != -1 or str(e).find("urlopen error EOF occurred in violation of protocol") != -1:
-                print_msg(e)
+                print_msg(str(e))
                 print_msg(url + " 访问超时，稍后重试")
                 time.sleep(10)
             # 400
@@ -718,7 +723,7 @@ def http_request2(url, post_data=None, header_list=None, is_random_ip=True):
     if not (url.find("http://") == 0 or url.find("https://") == 0):
         return ErrorResponse(-100)
     if HTTP_CONNECTION_POOL is None:
-        raise Exception("not init urllib3.PoolManager")
+        init_http_connection_pool()
 
     retry_count = 0
     while True:
@@ -759,10 +764,10 @@ def http_request2(url, post_data=None, header_list=None, is_random_ip=True):
                 print_msg(url)
                 print_msg(str(e))
         except urllib3.exceptions.ConnectTimeoutError, e:
-            print_msg(e)
+            print_msg(str(e))
             print_msg(url + " 访问超时，稍后重试")
         except urllib3.exceptions.ProtocolError, e:
-            print_msg(e)
+            print_msg(str(e))
             print_msg(url + " 访问超时，稍后重试")
         except Exception, e:
             print_msg(url)
