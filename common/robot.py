@@ -223,7 +223,7 @@ class Robot(object):
 
         # Http Setting
         tool.HTTP_CONNECTION_TIMEOUT = get_config(config, "HTTP_CONNECTION_TIMEOUT", 10, 1)
-        tool.HTTP_REQUEST_RETRY_COUNT = get_config(config, "HTTP_REQUEST_RETRY_COUNT", 100, 1)
+        tool.HTTP_REQUEST_RETRY_COUNT = get_config(config, "HTTP_REQUEST_RETRY_COUNT", 10, 1)
 
         # 线程数
         self.thread_count = get_config(config, "THREAD_COUNT", 10, 1)
@@ -427,3 +427,15 @@ def is_process_end():
     elif process.PROCESS_STATUS == process.PROCESS_STATUS_FINISH:
         return 2
     return 0
+
+
+# 获取网络文件下载失败的原因
+def get_save_net_file_failed_reason(return_code):
+    if return_code == 404:
+        return "源文件已被删除"
+    elif return_code == -1:
+        return "源文件多次获取失败，可能无法访问"
+    elif return_code == -2:
+        return "源文件多次下载后和原始文件大小不一致，可能网络环境较差"
+    elif return_code > 0:
+        return "未知错误，http code %s" % return_code

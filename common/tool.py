@@ -30,7 +30,7 @@ if sys.version_info < (2, 7, 12):
 elif sys.version_info >= (3,):
     raise Exception("仅支持python2.X，请访问官网 https://www.python.org/downloads/ 安装最新的python2")
 HTTP_CONNECTION_TIMEOUT = 10
-HTTP_REQUEST_RETRY_COUNT = 100
+HTTP_REQUEST_RETRY_COUNT = 10
 # https://www.python.org/dev/peps/pep-0476/
 # disable urllib3 HTTPS warning
 urllib3.disable_warnings()
@@ -758,22 +758,23 @@ def http_request2(url, post_data=None, header_list=None, is_random_ip=True):
             elif input_str in ["s", "stop"]:
                 sys.exit()
         except urllib3.exceptions.MaxRetryError, e:
+            print_msg(url)
+            print_msg(str(e))
             # 无限重定向
-            if str(e).find("Caused by ResponseError('too many redirects',)") >= 0:
-                return ErrorResponse(-1)
-            else:
-                print_msg(url)
-                print_msg(str(e))
+            # if str(e).find("Caused by ResponseError('too many redirects',)") >= 0:
+            #     return ErrorResponse(-1)
         except urllib3.exceptions.ConnectTimeoutError, e:
+            print_msg(str(e))
+            print_msg(url + " 访问超时，稍后重试")
             # 域名无法解析
-            if str(e).find("[Errno 11004] getaddrinfo failed") >= 0:
-                return ErrorResponse(-2)
-            else:
-                print_msg(str(e))
-                print_msg(url + " 访问超时，稍后重试")
+            # if str(e).find("[Errno 11004] getaddrinfo failed") >= 0:
+            #     return ErrorResponse(-2)
         except urllib3.exceptions.ProtocolError, e:
             print_msg(str(e))
             print_msg(url + " 访问超时，稍后重试")
+            # 链接被终止
+            # if str(e).find("'Connection aborted.', error(10054,") >= 0:
+            #     return ErrorResponse(-3)
         except Exception, e:
             print_msg(url)
             print_msg(str(e))
@@ -797,6 +798,11 @@ class ErrorResponse(object):
 # file_url 文件所在网址
 # file_path 文件所在本地路径，包括路径和文件名
 # need_content_type 是否需要读取response中的Content-Type作为后缀名，会自动替换file_path中的后缀名
+# return
+#       status: 0：失败，1：成功,
+#       code:   -1：无法访问（没有获得返回，可能是域名无法解析，请求被直接丢弃，地址被墙等）
+#               -2：下载失败（访问没有问题，但下载后与源文件大小不一致，网络问题）
+#               > 0：访问出错，对应url的http code
 def save_net_file2(file_url, file_path, need_content_type=False):
     file_path = change_path_encoding(file_path)
     create_file = False
@@ -817,16 +823,22 @@ def save_net_file2(file_url, file_path, need_content_type=False):
             content_length = get_response_info(response, "Content-Length")
             file_size = os.path.getsize(file_path)
             if (content_length is None) or (int(content_length) == file_size):
-                return True
+                return {"status": 1, "code": 0}
             else:
-                print_msg("本地文件%s: %s和网络文件%s:%s不一致" % (file_path, content_length, file_url, file_size))
-        elif response.status > 0:
+                print_msg("本地文件%s：%s和网络文件%s：%s不一致" % (file_path, content_length, file_url, file_size))
+        # 超过重试次数，直接退出
+        elif response.status == 0:
             if create_file:
                 os.remove(file_path)
-            return False
+            return {"status": 0, "code": -1}
+        # 其他http code，退出
+        else:
+            if create_file:
+                os.remove(file_path)
+            return {"status": 0, "code": response.status}
     if create_file:
         os.remove(file_path)
-    return False
+    return {"status": 0, "code": -2}
 
 
 # 获取请求response中的指定信息(urlib3)

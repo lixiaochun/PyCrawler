@@ -24,12 +24,11 @@ def check_relic_box():
 # 检测自动通过模式
 # 如果有检测到自动通关模式被关闭，开启后返回
 def check_progression_mode():
-    for pos_x in range(1110, 1130):
-        for pos_y in range(240, 260):
-            red, green, blue = ch.get_color(pos_x, pos_y)
-            if red == 255 and green == 0 and blue == 0:
-                ch.auto_click(1120, 250)
-                return True
+    for pos_x, pos_y in clickerHeroes.PROGRESSION_MODE_CHECK_POSITION:
+        red, green, blue = ch.get_color(pos_x, pos_y)
+        if red == 255 and green == 0 and blue == 0:
+            ch.auto_click(1120, 250)
+            return True
     return False
 
 
@@ -48,14 +47,15 @@ if __name__ == "__main__":
 
         # 每10分钟检测一次
         if count >= 600:
-            # 检测宝箱，并且只要开启过一次后就不再检测
-            if not is_open_equip_box and check_relic_box():
-                is_open_equip_box = True
-                print "open relic box"
+            # 只有窗口置顶时才进行判断
+            if ch.is_foreground_window():
+                # 检测宝箱，并且只要开启过一次后就不再检测
+                if not is_open_equip_box and check_relic_box():
+                    is_open_equip_box = True
+                    print "open relic box"
 
-            if check_progression_mode():
-                print "enable progression mode"
-
+                if check_progression_mode():
+                    print "enable progression mode"
             # 重置计数
             count = 0
 

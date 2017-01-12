@@ -40,11 +40,11 @@ def is_max_page_count(page_data, page_count):
         paging_data = tool.find_sub_string(page_data, '<div class="page topPaging">', "</div>")
         last_page = re.findall('/page-(\d*).html#main" class="lastPage"', paging_data)
         if len(last_page) == 1:
-            return int(last_page[0]) >= page_count
+            return page_count >= int(last_page[0])
         page_count_find = re.findall('<a [^>]*?>(\d*)</a>', paging_data)
         if len(page_count_find) > 0:
             page_count_find = map(int, page_count_find)
-            return max(page_count_find) >= page_count
+            return page_count >= max(page_count_find)
         return False
     # 只有下一页和上一页按钮的样式
     elif page_data.find('<a class="skinSimpleBtn pagingPrev"') >= 0:  # 有上一页按钮
@@ -101,8 +101,8 @@ def get_origin_image_url(image_url):
         return ""
     # 无效的地址
     elif image_url.find("https://mail.google.com/mail/") == 0 or image_url.find("http://vc.ameba.jp/view?") == 0 \
-            or image_url.find("https://b.st-hatena.com/images/entry-button/" ) == 0 or image_url[-9:] == "clear.gif" \
-            or image_url.find("http://jp.mg2.mail.yahoo.co.jp/ya/download") == 0:
+            or image_url.find("https://b.st-hatena.com/images/entry-button/" ) == 0 or image_url.find("http://jp.mg2.mail.yahoo.co.jp/ya/download") == 0 \
+            or image_url.find("http://blog.watanabepro.co.jp/") >= 0 or image_url[-9:] == "clear.gif":
         return ""
     # ameba上传图片
     elif image_url.find("http://stat.ameba.jp/user_images") == 0:
@@ -300,7 +300,8 @@ class Download(threading.Thread):
                         else:
                             file_type = image_url.split(".")[-1].split("?")[0]
                         file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
-                        if tool.save_net_file2(image_url, file_path):
+                        save_file_return = tool.save_net_file2(image_url, file_path)
+                        if save_file_return["status"] == 1:
                             if check_image_invalid(file_path):
                                 os.remove(file_path)
                                 log.step(account_name + " 第%s张图片 %s 不符合规则，删除" % (image_count, image_url))
@@ -308,7 +309,7 @@ class Download(threading.Thread):
                                 log.step(account_name + " 第%s张图片下载成功" % image_count)
                                 image_count += 1
                         else:
-                            log.error(account_name + " 第%s张图片 %s 获取失败" % (image_count, image_url))
+                            log.error(account_name + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
 
                     # 达到配置文件中的下载数量，结束
                     if 0 < GET_IMAGE_COUNT < image_count:
