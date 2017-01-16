@@ -17,7 +17,7 @@ class Shinoda(robot.Robot):
             robot.SYS_DOWNLOAD_IMAGE: True,
             robot.SYS_NOT_CHECK_SAVE_DATA: True,
         }
-        robot.Robot.__init__(self, sys_config, use_urllib3=True)
+        robot.Robot.__init__(self, sys_config)
 
     def main(self):
         # 解析存档文件
@@ -35,8 +35,9 @@ class Shinoda(robot.Robot):
         # 下载
         page_index = 1
         image_count = 1
-        is_over = False
         new_last_blog_id = ""
+        is_over = False
+        need_make_image_dir = True
         if self.is_sort:
             image_path = self.image_temp_path
         else:
@@ -45,11 +46,11 @@ class Shinoda(robot.Robot):
             log.step("开始解析第%s页日志" % page_index)
 
             index_url = "http://blog.mariko-shinoda.net/page%s.html" % (page_index - 1)
-            index_response = tool.http_request2(index_url)
+            index_page_return_code, index_page = tool.http_request(index_url)[:2]
 
-            if index_response.status == 200:
+            if index_page_return_code == 1:
                 # 获取页面内的全部图片
-                image_name_list = re.findall('data-original="./([^"]*)"', index_response.data)
+                image_name_list = re.findall('data-original="./([^"]*)"', index_page)
                 log.trace("第%s页获取的全部图片：%s" % (page_index, image_name_list))
 
                 for image_name in image_name_list:
@@ -68,14 +69,20 @@ class Shinoda(robot.Robot):
                     image_url = "http://blog.mariko-shinoda.net/%s" % image_name
                     log.step("开始下载第%s张图片 %s" % (image_count, image_url))
 
+                    # 第一张图片，创建目录
+                    if need_make_image_dir:
+                        if not tool.make_dir(image_path, 0):
+                            log.error("创建图片下载目录 %s 失败" % image_path)
+                            tool.process_exit()
+                        need_make_image_dir = False
+
                     file_type = image_url.split(".")[-1].split(":")[0]
                     file_path = os.path.join(image_path, "%05d.%s" % (image_count, file_type))
-                    save_file_return = tool.save_net_file2(image_url, file_path)
-                    if save_file_return["status"] == 1:
+                    if tool.save_net_file(image_url, file_path):
                         log.step("第%s张图片下载成功" % image_count)
                         image_count += 1
                     else:
-                        log.step("第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
+                        log.step("第%s张图片 %s 下载失败" % (image_count, image_url))
                 page_index += 1
             else:
                 log.error("无法访问博客页面 %s" % index_url)

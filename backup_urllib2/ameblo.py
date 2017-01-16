@@ -26,10 +26,10 @@ IS_SORT = True
 
 # 获取指定页数的日志页面
 def get_blog_page(account_name, page_count):
-    index_page_url = "http://ameblo.jp/%s/page-%s.html" % (account_name, page_count)
-    index_page_response = tool.http_request2(index_page_url)
-    if index_page_response.status == 200:
-        return index_page_response.data
+    page_url = "http://ameblo.jp/%s/page-%s.html" % (account_name, page_count)
+    page_return_code, page_data = tool.http_request(page_url)[:2]
+    if page_return_code == 1:
+        return page_data
     return None
 
 
@@ -40,21 +40,15 @@ def is_max_page_count(page_data, page_count):
         paging_data = tool.find_sub_string(page_data, '<div class="page topPaging">', "</div>")
         last_page = re.findall('/page-(\d*).html#main" class="lastPage"', paging_data)
         if len(last_page) == 1:
-            return page_count >= int(last_page[0])
+            return int(last_page[0]) >= page_count
         page_count_find = re.findall('<a [^>]*?>(\d*)</a>', paging_data)
         if len(page_count_find) > 0:
             page_count_find = map(int, page_count_find)
-            return page_count >= max(page_count_find)
+            return max(page_count_find) >= page_count
         return False
     # 只有下一页和上一页按钮的样式
     elif page_data.find('<a class="skinSimpleBtn pagingPrev"') >= 0:  # 有上一页按钮
         if page_data.find('<a class="skinSimpleBtn pagingNext"') == -1:  # 但没有下一页按钮
-            return True
-        else:
-            return False
-    # 只有下一页和上一页按钮的样式
-    elif page_data.find('class="skin-pagingPrev skin-btnPaging ga-pagingTopPrevTop') >= 0:  # 有上一页按钮
-        if page_data.find('class="skin-pagingNext skin-btnPaging ga-pagingTopNextTop') == -1:  # 但没有下一页按钮
             return True
         else:
             return False
@@ -69,14 +63,11 @@ def get_blog_id_list(page_data):
 # 从日志列表中获取全部的图片，并过滤掉表情
 def get_image_url_list(account_name, blog_id):
     blog_url = "http://ameblo.jp/%s/entry-%s.html" % (account_name, blog_id)
-    blog_page_response = tool.http_request2(blog_url)
-    if blog_page_response.status == 200:
-        blog_page = blog_page_response.data
+    blog_return_code, blog_page = tool.http_request(blog_url)[:2]
+    if blog_return_code == 1:
         article_data = tool.find_sub_string(blog_page, '<div class="subContentsInner">', "<!--entryBottom-->", 1)
         if not article_data:
             article_data = tool.find_sub_string(blog_page, '<div class="articleText">', "<!--entryBottom-->", 1)
-        if not article_data:
-            article_data = tool.find_sub_string(blog_page, '<div class="skin-entryInner">', "<!-- /skin-entry -->", 1)
         image_url_list_find = re.findall('<img [\S|\s]*?src="(http[^"]*)" [\S|\s]*?>', article_data)
         image_url_list = []
         for image_url in image_url_list_find:
@@ -123,8 +114,6 @@ def get_origin_image_url(image_url):
             else:
                 # todo 检测包含其他格式
                 log.error("无法解析的图片地址 %s" % image_url)
-    elif image_url.find("http://stat100.ameba.jp/blog/img/") == 0:
-        pass
     else:
         # todo 检测是否包含第三方图片
         log.error("第三方图片地址 %s" % image_url)
@@ -162,7 +151,7 @@ class Ameblo(robot.Robot):
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
         }
-        robot.Robot.__init__(self, sys_config, use_urllib3=True)
+        robot.Robot.__init__(self, sys_config)
 
         # 设置全局变量，供子线程调用
         GET_IMAGE_COUNT = self.get_image_count
@@ -298,13 +287,9 @@ class Download(threading.Thread):
                                 tool.process_exit()
                             need_make_image_dir = False
 
-                        if image_url.rfind("/") > image_url.rfind("."):
-                            file_type = "jpg"
-                        else:
-                            file_type = image_url.split(".")[-1].split("?")[0]
+                        file_type = image_url.split(".")[-1]
                         file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
-                        save_file_return = tool.save_net_file2(image_url, file_path)
-                        if save_file_return["status"] == 1:
+                        if tool.save_net_file(image_url, file_path):
                             if check_image_invalid(file_path):
                                 os.remove(file_path)
                                 log.step(account_name + " 第%s张图片 %s 不符合规则，删除" % (image_count, image_url))
@@ -312,7 +297,7 @@ class Download(threading.Thread):
                                 log.step(account_name + " 第%s张图片下载成功" % image_count)
                                 image_count += 1
                         else:
-                            log.error(account_name + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
+                            log.error(account_name + " 第%s张图片 %s 下载失败" % (image_count, image_url))
 
                     # 达到配置文件中的下载数量，结束
                     if 0 < GET_IMAGE_COUNT < image_count:

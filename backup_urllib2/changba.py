@@ -25,9 +25,9 @@ NEW_SAVE_DATA_PATH = ""
 # 根据account_id获取user_id
 def get_user_id(account_id):
     index_url = "http://changba.com/u/%s" % account_id
-    index_response = tool.http_request2(index_url)
-    if index_response.status == 200:
-        user_id = tool.find_sub_string(index_response.data, "var userid = '", "'")
+    index_return_code, index_page = tool.http_request(index_url)[:2]
+    if index_return_code == 1:
+        user_id = tool.find_sub_string(index_page, "var userid = '", "'")
         if user_id:
             return user_id
     return None
@@ -38,10 +38,10 @@ def get_user_id(account_id):
 def get_one_page_audio_list(user_id, page_count):
     # http://changba.com/member/personcenter/loadmore.php?userid=4306405&pageNum=1
     audio_album_url = "http://changba.com/member/personcenter/loadmore.php?userid=%s&pageNum=%s" % (user_id, page_count)
-    audio_album_response = tool.http_request2(audio_album_url)
-    if audio_album_response.status == 200:
+    audio_album_return_code, audio_album_page = tool.http_request(audio_album_url)[:2]
+    if audio_album_return_code == 1:
         try:
-            audio_album_page = json.loads(audio_album_response.data)
+            audio_album_page = json.loads(audio_album_page)
         except ValueError:
             pass
         else:
@@ -60,9 +60,9 @@ def get_one_page_audio_list(user_id, page_count):
 # audio_en_word_id => w-ptydrV23KVyIPbWPoKsA
 def get_audio_url(audio_en_word_id):
     audio_index_url = "http://changba.com/s/%s" % audio_en_word_id
-    audio_index_response = tool.http_request2(audio_index_url)
-    if audio_index_response.status == 200:
-        audio_source_url = tool.find_sub_string(audio_index_response.data, 'var a="', '"')
+    audio_index_return_code, audio_index_page = tool.http_request(audio_index_url)[:2]
+    if audio_index_return_code == 1:
+        audio_source_url = tool.find_sub_string(audio_index_page, 'var a="', '"')
         if audio_source_url:
             # 从JS处解析的规则
             special_find = re.findall("userwork/([abc])(\d+)/(\w+)/(\w+)\.mp3", audio_source_url)
@@ -219,12 +219,11 @@ class Download(threading.Thread):
                         need_make_download_dir = False
 
                     file_path = os.path.join(video_path, "%s - %s.mp3" % (audio_id, audio_info[1]))
-                    save_file_return = tool.save_net_file2(audio_url, file_path)
-                    if save_file_return["status"] == 1:
+                    if tool.save_net_file(audio_url, file_path):
                         log.step(account_name + " 第%s首歌曲下载成功" % video_count)
                         video_count += 1
                     else:
-                        log.error(account_name + " 第%s首歌曲 %s 下载失败，原因：%s" % (video_count, audio_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
+                        log.error(account_name + " 第%s首歌曲 %s 下载失败" % (video_count, audio_url))
 
                     # 达到配置文件中的下载数量，结束
                     if 0 < GET_VIDEO_COUNT < video_count:
