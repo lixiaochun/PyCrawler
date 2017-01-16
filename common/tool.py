@@ -272,6 +272,9 @@ def set_cookie_from_browser(file_path, browser_type, target_domains=""):
                 s.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (domain, domain_specified, path, secure, expires, name, value))
             except:
                 pass
+    else:
+        print_msg("不支持的浏览器类型：" + browser_type)
+        return False
     s.seek(0)
     cookie_jar = cookielib.MozillaCookieJar()
     cookie_jar._really_load(s, "", True, True)
@@ -325,6 +328,9 @@ def get_cookie_value_from_browser(cookie_key, file_path, browser_type, target_do
                 except:
                     return None
                 return value
+    else:
+        print_msg("不支持的浏览器类型：" + browser_type)
+        return None
     return None
 
 
@@ -350,6 +356,64 @@ def set_empty_cookie():
     cookie_jar = cookielib.MozillaCookieJar()
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie_jar))
     urllib2.install_opener(opener)
+
+
+# 从浏览器保存的cookie文件中读取所有cookie
+# return    {
+#           "domain1": {"key1": "value1", "key2": "value2", ......}
+#           "domain2": {"key1": "value1", "key2": "value2", ......}
+#           }
+def get_all_cookie_from_browser(browser_type, file_path):
+    if not os.path.exists(file_path):
+        print_msg("cookie目录：" + file_path + " 不存在")
+        return None
+    all_cookies = {}
+    if browser_type == 1:
+        for cookie_name in os.listdir(file_path):
+            if cookie_name.find(".txt") == -1:
+                continue
+            cookie_file = open(os.path.join(file_path, cookie_name), "r")
+            cookie_info = cookie_file.read()
+            cookie_file.close()
+            for cookies in cookie_info.split("*"):
+                cookie_list = cookies.strip("\n").split("\n")
+                if len(cookie_list) < 8:
+                    continue
+                cookie_domain = cookie_list[2].split("/")[0]
+                cookie_key = cookie_info[0]
+                cookie_value = cookie_info[1]
+                if cookie_domain not in all_cookies:
+                    all_cookies[cookie_domain] = {}
+                all_cookies[cookie_domain][cookie_key] = cookie_value
+    elif browser_type == 2:
+        con = sqlite3.connect(os.path.join(file_path, "cookies.sqlite"))
+        cur = con.cursor()
+        cur.execute("select host, path, isSecure, expiry, name, value from moz_cookies")
+        for cookie_info in cur.fetchall():
+            cookie_domain = cookie_info[0]
+            cookie_key = cookie_info[4]
+            cookie_value = cookie_info[5]
+            if cookie_domain not in all_cookies:
+                all_cookies[cookie_domain] = {}
+            all_cookies[cookie_domain][cookie_key] = cookie_value
+    elif browser_type == 3:
+        con = sqlite3.connect(os.path.join(file_path, "Cookies"))
+        cur = con.cursor()
+        cur.execute("select host_key, path, secure, expires_utc, name, value, encrypted_value from cookies")
+        for cookie_info in cur.fetchall():
+            cookie_domain = cookie_info[0]
+            cookie_key = cookie_info[4]
+            try:
+                cookie_value = win32crypt.CryptUnprotectData(cookie_info[6], None, None, None, 0)[1]
+            except:
+                continue
+            if cookie_domain not in all_cookies:
+                all_cookies[cookie_domain] = {}
+            all_cookies[cookie_domain][cookie_key] = cookie_value
+    else:
+        print_msg("不支持的浏览器类型：" + browser_type)
+        return None
+    return all_cookies
 
 
 # 设置代理
@@ -716,10 +780,11 @@ def set_proxy2(ip, port):
 
 
 # http请求(urlib3)
-# header_list   http header信息，e.g. {"Host":“www.example.com"}
-# is_random_ip  是否使用伪造IP
-# return        -1：无法访问；-100：URL格式不正确；其他>0：网页返回码（正常返回码为200）
-def http_request2(url, post_data=None, header_list=None, is_random_ip=True):
+# header_list       http header信息，e.g. {"Host":“www.example.com"}
+# is_random_ip      是否使用伪造IP
+# exception_return  如果异常信息中包含以下字符串，直接返回-1
+# return            0：无法访问，-1:特殊异常捕获后的返回，-100：URL格式不正确，其他>0：网页返回码（正常返回码为200）
+def http_request2(url, post_data=None, header_list=None, is_random_ip=True, exception_return= ""):
     if not (url.find("http://") == 0 or url.find("https://") == 0):
         return ErrorResponse(-100)
     if HTTP_CONNECTION_POOL is None:
@@ -757,27 +822,29 @@ def http_request2(url, post_data=None, header_list=None, is_random_ip=True):
                 pass
             elif input_str in ["s", "stop"]:
                 sys.exit()
-        except urllib3.exceptions.MaxRetryError, e:
-            print_msg(url)
-            print_msg(str(e))
-            # 无限重定向
-            # if str(e).find("Caused by ResponseError('too many redirects',)") >= 0:
-            #     return ErrorResponse(-1)
-        except urllib3.exceptions.ConnectTimeoutError, e:
-            print_msg(str(e))
-            print_msg(url + " 访问超时，稍后重试")
-            # 域名无法解析
-            # if str(e).find("[Errno 11004] getaddrinfo failed") >= 0:
-            #     return ErrorResponse(-2)
-        except urllib3.exceptions.ProtocolError, e:
-            print_msg(str(e))
-            print_msg(url + " 访问超时，稍后重试")
-            # 链接被终止
-            # if str(e).find("'Connection aborted.', error(10054,") >= 0:
-            #     return ErrorResponse(-3)
+        # except urllib3.exceptions.MaxRetryError, e:
+        #     print_msg(url)
+        #     print_msg(str(e))
+        #     # 无限重定向
+        #     # if str(e).find("Caused by ResponseError('too many redirects',)") >= 0:
+        #     #     return ErrorResponse(-1)
+        # except urllib3.exceptions.ConnectTimeoutError, e:
+        #     print_msg(str(e))
+        #     print_msg(url + " 访问超时，稍后重试")
+        #     # 域名无法解析
+        #     # if str(e).find("[Errno 11004] getaddrinfo failed") >= 0:
+        #     #     return ErrorResponse(-2)
+        # except urllib3.exceptions.ProtocolError, e:
+        #     print_msg(str(e))
+        #     print_msg(url + " 访问超时，稍后重试")
+        #     # 链接被终止
+        #     # if str(e).find("'Connection aborted.', error(10054,") >= 0:
+        #     #     return ErrorResponse(-3)
         except Exception, e:
-            print_msg(url)
+            if exception_return and str(e).find(exception_return) >= 0:
+                return ErrorResponse(-1)
             print_msg(str(e))
+            print_msg(url + " 访问超时，稍后重试")
             traceback.print_exc()
 
         retry_count += 1
