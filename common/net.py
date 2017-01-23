@@ -25,6 +25,7 @@ HTTP_RETURN_CODE_RETRY = 0
 HTTP_RETURN_CODE_URL_INVALID = -1
 HTTP_RETURN_CODE_JSON_DECODE_ERROR = -2
 HTTP_RETURN_CODE_EXCEPTION_CATCH = -10
+HTTP_RETURN_CODE_SUCCEED = 200
 
 
 # 错误response的对象
@@ -33,6 +34,8 @@ class ErrorResponse(object):
         self.status = status
         self.data = None
         self.headers = {}
+        self.json_data = []
+        self.extra_info = {}
 
 
 # 初始化urllib3的连接池
@@ -181,7 +184,7 @@ def save_net_file(file_url, file_path, need_content_type=False):
     create_file = False
     for i in range(0, 5):
         response = http_request(file_url)
-        if response.status == 200:
+        if response.status == HTTP_RETURN_CODE_SUCCEED:
             # response中的Content-Type作为文件后缀名
             if need_content_type:
                 content_type = get_response_info(response, "Content-Type")

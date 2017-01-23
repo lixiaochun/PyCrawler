@@ -32,7 +32,7 @@ def get_one_page_blog(account_name, page_count):
         "blog_id_list": [],  # 页面解析出的所有日志id列表
         "is_over": False,  # 是不是最后一页日志
     }
-    if index_page_response.status == 200:
+    if index_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         extra_info["blog_id_list"] = re.findall('data-unique-entry-id="([\d]*)"', index_page_response.data)
         # 检测是否还有下一页
         # 有页数选择的页面样式
@@ -57,14 +57,14 @@ def get_one_page_blog(account_name, page_count):
     return index_page_response
 
 
-# 获取指定id的日志页面
+# 获取指定id的日志
 def get_blog_page(account_name, blog_id):
     blog_page_url = "http://ameblo.jp/%s/entry-%s.html" % (account_name, blog_id)
     blog_page_response = net.http_request(blog_page_url)
     extra_info = {
         "image_url_list": [],  # 页面解析出的所有图片地址列表
     }
-    if blog_page_response.status == 200:
+    if blog_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         # 日志正文部分（有多种页面模板）
         article_data = tool.find_sub_string(blog_page_response.data, '<div class="subContentsInner">', "<!--entryBottom-->", 1)
         if not article_data:
@@ -244,7 +244,7 @@ class Download(threading.Thread):
 
                 # 获取一页日志
                 index_page_response = get_one_page_blog(account_name, page_count)
-                if index_page_response.status != 200:
+                if index_page_response.status != net.HTTP_RETURN_CODE_SUCCEED:
                     log.error(account_name + " 第%s页日志访问失败，原因：%s" % (page_count, robot.get_http_request_failed_reason(index_page_response.status)))
                     tool.process_exit()
 
@@ -255,7 +255,7 @@ class Download(threading.Thread):
                 log.trace(account_name + " 第%s页获取的所有日志：%s" % (page_count, index_page_response.extra_info["blog_id_list"]))
 
                 for blog_id in index_page_response.extra_info["blog_id_list"]:
-                    # 检查是否是上一次的最后blog
+                    # 检查是否已下载到前一次的日志
                     if int(blog_id) <= int(self.account_info[2]):
                         break
 
@@ -271,9 +271,9 @@ class Download(threading.Thread):
 
                     log.step(account_name + " 开始解析日志%s" % blog_id)
 
-                    # 获取指定id的日志
+                    # 获取日志
                     blog_page_response = get_blog_page(account_name, blog_id)
-                    if blog_page_response.status != 200:
+                    if blog_page_response.status != net.HTTP_RETURN_CODE_SUCCEED:
                         log.error(account_name + " 日志%s访问失败，原因：%s" % (blog_id, robot.get_http_request_failed_reason(blog_page_response.status)))
                         tool.process_exit()
 

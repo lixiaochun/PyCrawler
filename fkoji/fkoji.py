@@ -84,7 +84,7 @@ class Fkoji(robot.Robot):
 
             # 获取一页图片
             index_page_response = get_one_page_image(page_count)
-            if index_page_response.status != 200:
+            if index_page_response.status != net.HTTP_RETURN_CODE_SUCCEED:
                 log.error("第%s页图片访问失败，原因：%s" % (page_count, robot.get_http_request_failed_reason(index_page_response.status)))
                 tool.process_exit()
 
@@ -104,7 +104,7 @@ class Fkoji(robot.Robot):
                     log.error("第%s张图片，解析tweet-created-at失败" % image_count)
                     continue
 
-                # 下载完毕
+                # 检查是否已下载到前一次的图片
                 if tweet_created_time <= save_data_image_time:
                     is_over = True
                     break
