@@ -114,7 +114,7 @@ def login():
 def follow(account_id):
     follow_page_url = "http://bcy.net/weibo/Operate/follow?"
     follow_post_data = {"uid": account_id, "type": "dofollow"}
-    follow_page_response = net.http_request(follow_page_url, follow_post_data)
+    follow_page_response = net.http_request(follow_page_url, post_data=follow_post_data)
     if follow_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         # 0 未登录，11 关注成功，12 已关注
         if int(follow_page_response.data) == 12:
@@ -126,7 +126,7 @@ def follow(account_id):
 def unfollow(account_id):
     unfollow_page_url = "http://bcy.net/weibo/Operate/follow?"
     unfollow_post_data = {"uid": account_id, "type": "unfollow"}
-    unfollow_page_response = net.http_request(unfollow_page_url, unfollow_post_data)
+    unfollow_page_response = net.http_request(unfollow_page_url, post_data=unfollow_post_data)
     if unfollow_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         if int(unfollow_page_response.data) == 1:
             return True
@@ -156,9 +156,9 @@ def get_one_page_album(account_id, page_count):
             if "${post.title}" in extra_info["album_title_list"]:
                 extra_info["album_title_list"].remove("${post.title}")
         # 检测是否还有下一页
-        max_page_count = re.findall('<a href="/u/' + account_id + '/post/cos\?&p=(\d+)">' , index_page_response.data)
-        if max_page_count:
-            max_page_count = max(max_page_count)
+        page_count_find = re.findall('<a href="/u/' + account_id + '/post/cos\?&p=(\d+)">' , index_page_response.data)
+        if len(page_count_find) > 0:
+            max_page_count = max(map(int, page_count_find))
         else:
             max_page_count = 1
         if page_count >= max_page_count:
