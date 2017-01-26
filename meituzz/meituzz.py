@@ -31,7 +31,7 @@ def get_album_page(page_count):
         if album_page_response.data.find('<input type="hidden" id="imageList"') >= 0:
             image_info = {
                 "is_error": False,  # 获取的图片数量和图片地址数量是否一致
-                "image_url_list": [],  # 获取的图片地址列表
+                "image_url_list": [],  # 页面解析出的所有图片地址列表
             }
             # 获取图片数量
             image_count_find = tool.find_sub_string(album_page_response.data, '<input type="hidden" id="totalPageNum" value=', " ")
@@ -40,21 +40,24 @@ def get_album_page(page_count):
                 # 获取图片地址列表
                 image_url_list_find = tool.find_sub_string(album_page_response.data, '<input type="hidden" id="imageList" value=', " ")
                 try:
-                    image_info["image_url_list"] = json.loads(image_url_list_find)
+                    image_url_list = json.loads(image_url_list_find)
                 except ValueError:
-                    pass
-                if len(image_info["image_url_list"]) == 0:
                     image_info["is_error"] = True
-                elif len(image_info["image_url_list"]) != image_count:
-                    album_reward_find = re.findall('<input type="hidden" id="rewardAmount" value="(\d*)">', album_page_response.data)
-                    # 收费相册
-                    if len(album_reward_find) == 1 and album_reward_find[0].isdigit() and int(album_reward_find) > 0:
-                        # 图片地址数量大于获取的数量，或者获取的数量比图片地址数量多一张以上
-                        if image_count < len(image_info["image_url_list"]) or image_count > len(image_info["image_url_list"]) + 1:
+                else:
+                    if len(image_url_list) == 0:
+                        image_info["is_error"] = True
+                    elif len(image_url_list) != image_count:
+                        album_reward_find = re.findall('<input type="hidden" id="rewardAmount" value="(\d*)">', album_page_response.data)
+                        # 收费相册
+                        if len(album_reward_find) == 1 and album_reward_find[0].isdigit() and int(album_reward_find) > 0:
+                            # 图片地址数量大于获取的数量，或者获取的数量比图片地址数量多一张以上
+                            if image_count < len(image_url_list) or image_count > len(image_url_list) + 1:
+                                image_info["is_error"] = True
+                        else:
+                            # 非收费相册，两个数量不一致
                             image_info["is_error"] = True
                     else:
-                        # 非收费相册，两个数量不一致
-                        image_info["is_error"] = True
+                        image_info["image_url_list"] = image_url_list
             else:
                 image_info["is_error"] = True
             extra_info["image_info"] = image_info
@@ -76,28 +79,6 @@ def get_album_page(page_count):
             extra_info["video_info"] = video_info
     album_page_response.extra_info = extra_info
     return album_page_response
-
-
-# 根据页面内容获取图片下载地址列表
-def get_image_url_list(album_page):
-    image_url_list_find = tool.find_sub_string(album_page, '<input type="hidden" id="imageList" value=', " ")
-    try:
-        image_url_list_find = json.loads(image_url_list_find)
-    except ValueError:
-        return None
-    image_url_list = []
-    for temp_image_list in image_url_list_find:
-        image_url_list += temp_image_list
-    return image_url_list
-
-
-# 根据页面内容获取视频下载地址
-def get_video_url(album_page):
-    video_url = tool.find_sub_string(album_page, '<input type="hidden" id="VideoUrl" value="', '">')
-    if video_url[0] == "/":
-        return "http://t.xiutuzz.com%s" % video_url
-    else:
-        return video_url
 
 
 class MeiTuZZ(robot.Robot):
