@@ -26,7 +26,7 @@ IS_SORT = True
 # 获取指定token后的一页相册
 def get_one_page_blog(account_id, token):
     index_page_url = "https://plus.google.com/_/photos/pc/read/"
-    post_data = 'f.req=[["posts",null,null,"synthetic:posts:%s",3,"%s",null],[%s,1,null],"%s",null,null,null,null,null,null,null,2]' % (account_id, account_id, GET_IMAGE_URL_COUNT, token)
+    post_data = {"f.req": '[["posts",null,null,"synthetic:posts:%s",3,"%s",null],[%s,1,null],"%s",null,null,null,null,null,null,null,2]' % (account_id, account_id, GET_IMAGE_URL_COUNT, token)}
     index_page_response = net.http_request(index_page_url, post_data=post_data)
     extra_info = {
         "blog_url_list": [],  # 页面解析出的日志地址列表
@@ -101,7 +101,7 @@ class GooglePlus(robot.Robot):
             robot.SYS_DOWNLOAD_IMAGE: True,
             robot.SYS_SET_PROXY: True,
         }
-        robot.Robot.__init__(self, sys_config)
+        robot.Robot.__init__(self, sys_config, use_urllib3=True)
 
         # 设置全局变量，供子线程调用
         GET_IMAGE_COUNT = self.get_image_count
