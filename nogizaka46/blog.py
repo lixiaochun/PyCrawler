@@ -7,6 +7,7 @@ email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
 from common import log, net, robot, tool
+from PIL import Image
 import os
 import re
 import threading
@@ -77,15 +78,33 @@ def check_big_image(image_url, big_2_small_list):
         "is_over": False,  # 是不是已经没有还生效的大图了
     }
     if image_url in big_2_small_list:
-        big_image_response = net.http_request(big_2_small_list[image_url])
-        if big_image_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-            temp_image_url = tool.find_sub_string(big_image_response.data, '<img src="', '"')
-            if temp_image_url != "/img/expired.gif":
-                extra_info["image_url"] = temp_image_url
-            else:
-                extra_info["is_over"] = True
+        if big_2_small_list[image_url].find("http://dcimg.awalker.jp") == 0:
+            big_image_response = net.http_request(big_2_small_list[image_url])
+            if big_image_response.status == net.HTTP_RETURN_CODE_SUCCEED:
+                temp_image_url = tool.find_sub_string(big_image_response.data, '<img src="', '"')
+                if temp_image_url != "/img/expired.gif":
+                    extra_info["image_url"] = temp_image_url
+                else:
+                    extra_info["is_over"] = True
+        else:
+            extra_info["image_url"] = big_2_small_list[image_url]
     big_image_response.extra_info = extra_info
     return big_image_response
+
+
+# 检测图片是否有效
+def check_image_invalid(file_path):
+    file_size = os.path.getsize(file_path)
+    # 文件小于1K
+    if file_size < 1024:
+        try:
+            image = Image.open(file_path)
+        except IOError:  # 不是图片格式
+            return True
+        # 长或宽任意小于20像素的
+        if image.height <= 20 or image.width <= 20:
+            return True
+    return False
 
 
 class Blog(robot.Robot):
@@ -232,7 +251,8 @@ class Download(threading.Thread):
                             big_image_response = check_big_image(image_url, blog_info["big_2_small_image_lust"])
                             if big_image_response.extra_info["image_url"] is not None:
                                 image_url = big_image_response.extra_info["image_url"]
-                                header_list = {"Cookie": big_image_response.headers["Set-Cookie"]}
+                                if "Set-Cookie" in big_image_response.headers:
+                                    header_list = {"Cookie": big_image_response.headers["Set-Cookie"]}
                             is_big_image_over = big_image_response.extra_info["is_over"]
                         log.step(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
 
@@ -249,8 +269,12 @@ class Download(threading.Thread):
                         file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
                         save_file_return = net.save_net_file(image_url, file_path, header_list=header_list)
                         if save_file_return["status"] == 1:
-                            log.step(account_name + " 第%s张图片下载成功" % image_count)
-                            image_count += 1
+                            if check_image_invalid(file_path):
+                                os.remove(file_path)
+                                log.step(account_name + " 第%s张图片 %s 不符合规则，删除" % (image_count, image_url))
+                            else:
+                                log.step(account_name + " 第%s张图片下载成功" % image_count)
+                                image_count += 1
                         else:
                             log.error(account_name + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
 
