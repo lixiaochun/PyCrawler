@@ -285,6 +285,10 @@ class Download(threading.Thread):
                     log.trace(account_name + " 相册存档页%s解析的所有图片：%s" % (blog_info["blog_id"], album_page_response.extra_info["image_url_list"]))
 
                     for image_url in album_page_response.extra_info["image_url_list"]:
+                        # 视频跳过
+                        if image_url.find("video.googleusercontent.com") != -1:
+                            continue
+
                         log.step(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
 
                         # 第一张图片，创建目录
@@ -295,12 +299,18 @@ class Download(threading.Thread):
                             need_make_download_dir = False
 
                         file_path = os.path.join(image_path, "%04d.jpg" % image_count)
-                        save_file_return = net.save_net_file(image_url, file_path, need_content_type=True)
-                        if save_file_return["status"] == 1:
-                            log.step(account_name + " 第%s张图片下载成功" % image_count)
-                            image_count += 1
-                        else:
-                            log.error(account_name + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
+                        retry_count = 0
+                        while True:
+                            save_file_return = net.save_net_file(image_url, file_path, need_content_type=True)
+                            if save_file_return["status"] == 1:
+                                log.step(account_name + " 第%s张图片下载成功" % image_count)
+                                image_count += 1
+                            elif save_file_return["status"] == 0 and save_file_return["code"] == 500 and retry_count <= 5:
+                                retry_count += 1
+                                continue
+                            else:
+                                log.error(account_name + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
+                            break
 
                         # 达到配置文件中的下载数量，结束
                         if 0 < GET_IMAGE_COUNT < image_count:
