@@ -7,12 +7,14 @@ email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
 from common import log, net, robot, tool
+import json
 import os
 import re
 import threading
 import time
 import traceback
-import urllib2
+import urllib
+import urlparse
 
 ACCOUNTS = []
 TOTAL_IMAGE_COUNT = 0
@@ -29,51 +31,86 @@ IS_DOWNLOAD_VIDEO = True
 
 
 # 获取一页的日志地址列表
-def get_one_page_post_url_list(account_id, page_count):
-    index_page_url = "http://%s.tumblr.com/page/%s" % (account_id, page_count)
+def get_one_page_post(account_id, page_count):
+    host = "http://%s.tumblr.com" % account_id
+    index_page_url = "%s/page/%s" % (host, page_count)
     index_page_response = net.http_request(index_page_url)
+    extra_info = {
+        "is_error": True,  # 是不是格式不符合
+        "post_url_list": [],  # 页面解析出的日志地址列表
+        "is_over": [],  # 是不是已经没有日志了
+    }
     if index_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-        return re.findall('"(http[s]?://' + account_id + '.tumblr.com/post/[^"|^#]*)["|#]', index_page_response.data)
-    return None
+        page_data = tool.find_sub_string(index_page_response.data, '<script type="application/ld+json">', "</script>").strip()
+        if page_data:
+            try:
+                page_data = json.loads(page_data)
+            except ValueError:
+                pass
+            else:
+                if robot.check_sub_key(("itemListElement",), page_data):
+                    extra_info["is_error"] = False
+                    for post_info in page_data["itemListElement"]:
+                        post_url_split = urlparse.urlsplit(post_info["url"].encode("utf-8"))
+                        post_url = post_url_split[0] + "://" + post_url_split[1] + urllib.quote(post_url_split[2])
+                        extra_info["post_url_list"].append(str(post_url))
+        else:
+            extra_info["is_over"] = True
+    index_page_response.extra_info = extra_info
+    return index_page_response
 
 
-# 根据post id将同样的信息页合并
-def filter_post_url(post_url_list):
-    new_post_url_list = {}
-    for post_url in post_url_list:
-        # 无效的信息页
-        post_url = post_url.replace("/embed", "")
-        temp = post_url[post_url.find("tumblr.com/post/") + len("tumblr.com/post/"):].split("/", 1)
-        post_id = temp[0]
-        if post_id not in new_post_url_list:
-            new_post_url_list[post_id] = []
-        # photoset_iframe 开头的地址，是相册的播放页，无效的
-        if post_url.find("photoset_iframe/") == -1 and len(temp) == 2:
-            new_post_url_list[post_id].append(temp[1])
-
-    # 去重排序
-    for post_id in new_post_url_list:
-        new_post_url_list[post_id] = sorted(list(set(new_post_url_list[post_id])), reverse=True)
-
-    return new_post_url_list
-
-
-# 根据日志地址以及可能的后缀，获取日志页面的head标签下的内容
-def get_post_page_head(account_id, post_id, postfix_list):
-    post_url = "http://%s.tumblr.com/post/%s" % (account_id, post_id)
-    post_page_response = net.http_request(post_url, exception_return="Caused by ResponseError('too many redirects',)")
-    # 不带后缀的可以访问，则直接返回页面
-    # 如果无法访问，则依次访问带有后缀的页面
-    if post_page_response.status == net.HTTP_RETURN_CODE_EXCEPTION_CATCH:
-        for postfix in postfix_list:
-            temp_post_url = post_url + "/" + urllib2.quote(postfix)
-            post_page_response = net.http_request(temp_post_url, exception_return="Caused by ResponseError('too many redirects',)")
-            if post_page_response.status != net.HTTP_RETURN_CODE_EXCEPTION_CATCH:
-                break
+# 获取日志页面
+def get_post_page(post_url):
+    post_page_response = net.http_request(post_url)
+    extra_info = {
+        "is_error": True,  # 是不是格式不符合
+        "has_video": False,  # 是不是包含视频
+        "image_url_list": [],  # 页面解析出的图片地址列表
+    }
     if post_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-        return tool.find_sub_string(post_page_response.data, "<head", "</head>", 3)
-    else:
-        return None
+        post_page_head = tool.find_sub_string(post_page_response.data, "<head", "</head>", 3)
+        if post_page_head:
+            # 获取og_type（页面类型的是视频还是图片或其他）
+            og_type = tool.find_sub_string(post_page_head, '<meta property="og:type" content="', '" />')
+            if og_type:
+                extra_info["is_error"] = False
+                # 空、音频、引用，跳过
+                if og_type in ["tumblr-feed:entry", "tumblr-feed:audio", "tumblr-feed:quote", "tumblr-feed:link"]:
+                    pass
+                else:
+                    if og_type == "tumblr-feed:video":
+                        extra_info["has_video"] = True
+                        image_url = tool.find_sub_string(post_page_head, '<meta property="og:image" content="', '" />')
+                        if image_url and image_url != "http://assets.tumblr.com/images/og/fb_landscape_share.png":
+                            extra_info["image_url_list"].append(image_url)
+                    else:
+                        image_url_list = re.findall('"(http[s]?://\w*[.]?media.tumblr.com/[^"]*)"', post_page_head)
+                        new_image_url_list = {}
+                        for image_url in image_url_list:
+                            # 头像，跳过
+                            if image_url.find("/avatar_") != -1:
+                                continue
+
+                            image_id = image_url[image_url.find("media.tumblr.com/") + len("media.tumblr.com/"):].split("_")[0]
+                            # 判断是否有分辨率更小的相同图片
+                            if image_id in new_image_url_list:
+                                resolution = image_url.split("_")[-1].split(".")[0]
+                                if resolution[-1] == "h":
+                                    resolution = int(resolution[:-1])
+                                else:
+                                    resolution = int(resolution)
+                                old_resolution = new_image_url_list[image_id].split("_")[-1].split(".")[0]
+                                if old_resolution[-1] == "h":
+                                    old_resolution = int(old_resolution[:-1])
+                                else:
+                                    old_resolution = int(old_resolution)
+                                if resolution < old_resolution:
+                                    continue
+                            new_image_url_list[image_id] = image_url
+                        extra_info["image_url_list"] = new_image_url_list.values()
+    post_page_response.extra_info = extra_info
+    return post_page_response
 
 
 # 根据日志id获取页面中的全部视频信息（视频地址、视频）
@@ -246,20 +283,23 @@ class Download(threading.Thread):
                 log.step(account_id + " 开始解析第%s页相册" % page_count)
 
                 # 获取一页的日志地址
-                post_url_list = get_one_page_post_url_list(account_id, page_count)
-                if post_url_list is None:
-                    log.error(account_id + " 无法访问第%s页相册" % page_count)
+                index_page_response = get_one_page_post(account_id, page_count)
+                if index_page_response.status != net.HTTP_RETURN_CODE_SUCCEED:
+                    log.error(account_id + " 第%s页相册访问失败，原因：%s" % (page_count, robot.get_http_request_failed_reason(index_page_response.status)))
                     tool.process_exit()
 
-                # 如果为空，表示已经取完了
-                if len(post_url_list) == 0:
+                if index_page_response.extra_info["is_over"]:
                     break
 
-                log.trace(account_id + " 相册第%s页解析的所有日志：%s" % (page_count, post_url_list))
-                post_url_list_group_by_post_id = filter_post_url(post_url_list)
-                log.trace(account_id + " 相册第%s页去重排序后的所有日志：%s" % (page_count, post_url_list_group_by_post_id))
+                if index_page_response.extra_info["is_error"]:
+                    log.error(account_id + " 第%s页相册解析失败" % page_count)
+                    tool.process_exit()
 
-                for post_id in sorted(post_url_list_group_by_post_id.keys(), reverse=True):
+                log.trace(account_id + " 相册第%s页解析的所有日志：%s" % (page_count, index_page_response.extra_info["post_url_list"]))
+
+                for post_url in index_page_response.extra_info["post_url_list"]:
+                    post_id = tool.find_sub_string(post_url, "/post/").split("/")[0]
+
                     # 检查信息页id是否小于上次的记录
                     if int(post_id) <= int(self.account_info[3]):
                         is_over = True
@@ -269,38 +309,29 @@ class Download(threading.Thread):
                     if first_post_id == "":
                         first_post_id = post_id
 
-                    log.step(account_id + " 开始解析日志%s" % post_id)
-
-                    # 获取信息页并截取head标签内的内容
-                    post_page_head = get_post_page_head(account_id, post_id, post_url_list_group_by_post_id[post_id])
-                    if post_page_head is None:
-                        log.error(account_id + " 无法访问日志%s" % post_id)
-                        continue
-                    if not post_page_head:
-                        log.error(account_id + " 日志%s截取head标签失败" % post_id)
-                        continue
-
-                    # 获取og_type（页面类型的是视频还是图片或其他）
-                    og_type = tool.find_sub_string(post_page_head, '<meta property="og:type" content="', '" />')
-                    if not og_type:
-                        log.error(account_id + " 日志%s，'og:type'解析失败" % post_id)
-                        continue
-
-                    # 空、音频、引用，跳过
-                    if og_type in ["tumblr-feed:entry", "tumblr-feed:audio", "tumblr-feed:quote", "tumblr-feed:link"]:
-                        continue
-
                     # 新增信息页导致的重复判断
                     if post_id in unique_list:
                         continue
                     else:
                         unique_list.append(post_id)
 
+                    log.step(account_id + " 开始解析日志%s" % post_url)
+
+                    # 获取日志
+                    post_page_response = get_post_page(post_url)
+                    if post_page_response.status != net.HTTP_RETURN_CODE_SUCCEED:
+                        log.error(account_id + " 日志%s访问失败，原因：%s" % (post_url, robot.get_http_request_failed_reason(post_page_response.status)))
+                        continue
+
+                    if post_page_response.extra_info["is_error"]:
+                        log.error(account_id + " 日志%s解析失败")
+                        continue
+
                     # 视频下载
-                    if IS_DOWNLOAD_VIDEO and og_type == "tumblr-feed:video":
+                    if IS_DOWNLOAD_VIDEO and post_page_response.extra_info["has_video"]:
                         video_list = get_video_info_list(account_id, post_id)
                         if video_list is None:
-                            log.error(account_id + " 第%s个视频 日志%s无法解析视频播放页" % (video_count, post_id))
+                            log.error(account_id + " 第%s个视频 日志%s无法解析视频播放页" % (video_count, post_url))
                         else:
                             if len(video_list) > 0:
                                 for video_play_url, video_type in list(video_list):
@@ -328,42 +359,29 @@ class Download(threading.Thread):
                                     else:
                                         log.error(account_id + " 第%s个视频 %s 下载失败，原因：%s" % (video_count, video_play_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
                             else:
-                                log.error(account_id + " 第%s个视频 日志%s中没有找到视频" % (video_count, post_id))
+                                log.error(account_id + " 第%s个视频 日志%s中没有找到视频" % (video_count, post_url))
 
                     # 图片下载
-                    if IS_DOWNLOAD_IMAGE:
-                        if og_type == "tumblr-feed:video":
-                            page_image_url_list = []
-                            video_image_url = tool.find_sub_string(post_page_head, '<meta property="og:image" content="', '" />')
-                            if video_image_url and video_image_url != "http://assets.tumblr.com/images/og/fb_landscape_share.png":
-                                page_image_url_list.append(video_image_url)
-                        else:
-                            page_image_url_list = re.findall('"(http[s]?://\w*[.]?media.tumblr.com/[^"]*)"', post_page_head)
-                            log.trace(account_id + " 日志%s过滤前的所有图片：%s" % (post_id, page_image_url_list))
-                            # 过滤头像以及页面上找到不同分辨率的同一张图
-                            page_image_url_list = filter_different_resolution_images(page_image_url_list)
-                        log.trace(account_id + " 日志%s解析的的所有图片：%s" % (post_id, page_image_url_list))
-                        if len(page_image_url_list) > 0:
-                            for image_url in page_image_url_list:
-                                log.step(account_id + " 开始下载第%s张图片 %s" % (image_count, image_url))
+                    if IS_DOWNLOAD_IMAGE and len(post_page_response.extra_info["image_url_list"]) > 0:
+                        log.trace(account_id + " 日志%s解析的的所有图片：%s" % (post_url, post_page_response.extra_info["image_url_list"]))
+                        for image_url in post_page_response.extra_info["image_url_list"]:
+                            log.step(account_id + " 开始下载第%s张图片 %s" % (image_count, image_url))
 
-                                # 第一张图片，创建目录
-                                if need_make_image_dir:
-                                    if not tool.make_dir(image_path, 0):
-                                        log.error(account_id + " 创建图片下载目录 %s 失败" % image_path)
-                                        tool.process_exit()
-                                    need_make_image_dir = False
+                            # 第一张图片，创建目录
+                            if need_make_image_dir:
+                                if not tool.make_dir(image_path, 0):
+                                    log.error(account_id + " 创建图片下载目录 %s 失败" % image_path)
+                                    tool.process_exit()
+                                need_make_image_dir = False
 
-                                file_type = image_url.split(".")[-1]
-                                image_file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
-                                save_file_return = net.save_net_file(image_url, image_file_path)
-                                if save_file_return["status"] == 1:
-                                    log.step(account_id + " 第%s张图片下载成功" % image_count)
-                                    image_count += 1
-                                else:
-                                    log.error(account_id + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
-                        else:
-                            log.error(account_id + " 第%s张图片 日志%s中没有找到图片" % (image_count, post_id))
+                            file_type = image_url.split(".")[-1]
+                            image_file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
+                            save_file_return = net.save_net_file(image_url, image_file_path)
+                            if save_file_return["status"] == 1:
+                                log.step(account_id + " 第%s张图片下载成功" % image_count)
+                                image_count += 1
+                            else:
+                                log.error(account_id + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
 
                 if not is_over:
                     # 达到配置文件中的下载数量，结束
