@@ -121,10 +121,10 @@ def get_video_play_page(account_id, post_id):
         "video_url": None,  # 页面解析出的视频地址
     }
     if video_play_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-        video_url_find = re.findall('src="(http[s]?://www.tumblr.com/video_file/[^"]*)" type="[^"]*"', video_play_page_response.data)
+        video_url_find = re.findall('src="(http[s]?://' + account_id + '.tumblr.com/video_file/[^"]*)" type="[^"]*"', video_play_page_response.data)
         if len(video_url_find) == 1:
             video_response = net.http_request(video_url_find[0], redirect=False)
-            if video_response.status == net.HTTP_RETURN_CODE_SUCCEED and "Location" in video_response.headers:
+            if video_response.status == 302 and "Location" in video_response.headers:
                 # http://vtt.tumblr.com/tumblr_okstty6tba1rssthv_r1_480.mp4#_=
                 # ->
                 # http://vtt.tumblr.com/tumblr_okstty6tba1rssthv_r1_720.mp4
@@ -134,7 +134,7 @@ def get_video_play_page(account_id, post_id):
                 # ->
                 # http://vtt.tumblr.com/tumblr_nj59qwEQoV1qjl082.mp4
                 # 去除视频指定分辨率
-                temp_list = video_play_page_url.split("/")
+                temp_list = video_url_find[0].split("/")
                 if temp_list[-1].isdigit():
                     video_id = temp_list[-2]
                 else:
@@ -347,12 +347,19 @@ class Download(threading.Thread):
 
                             file_type = image_url.split(".")[-1]
                             image_file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
-                            save_file_return = net.save_net_file(image_url, image_file_path)
-                            if save_file_return["status"] == 1:
-                                log.step(account_id + " 第%s张图片下载成功" % image_count)
-                                image_count += 1
-                            else:
-                                log.error(account_id + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
+                            retry_count = 0
+                            while True:
+                                save_file_return = net.save_net_file(image_url, image_file_path)
+                                if save_file_return["status"] == 1:
+                                    log.step(account_id + " 第%s张图片下载成功" % image_count)
+                                    image_count += 1
+                                # 下载失败，并且http_code不是403和404，重试
+                                elif save_file_return["status"] == 0 and save_file_return["code"] not in [403, 404] and retry_count <= 5:
+                                    retry_count += 1
+                                    continue
+                                else:
+                                    log.error(account_id + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
+                                break
 
                 if not is_over:
                     # 达到配置文件中的下载数量，结束
