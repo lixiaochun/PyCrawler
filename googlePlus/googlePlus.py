@@ -29,14 +29,14 @@ def get_one_page_blog(account_id, token):
     extra_info = {
         "is_error": True,  # 是不是格式不符合
         "blog_info_list": [],  # 页面解析出的日志信息列表
-        "key": None,  # 页面解析出的下一页token
+        "next_page_key": None,  # 页面解析出的下一页token
         "json_data": None,  # 原始数据
     }
     script_data = []
     if token:
         index_page_url = "https://get.google.com/_/AlbumArchiveUi/data"
         post_data = {"f.req": '[[[113305009,[{"113305009":["%s",null,2,16,"%s"]}],null,null,0]]]' % (account_id, token)}
-        index_page_response = net.http_request(index_page_url, post_data=post_data)
+        index_page_response = net.http_request(index_page_url, method="POST", post_data=post_data)
         if index_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
             script_data_string = tool.find_sub_string(index_page_response.data, ")]}'", None).strip()
             try:
@@ -68,14 +68,16 @@ def get_one_page_blog(account_id, token):
                 extra_blog_info = {
                     "blog_id": None,  # 页面解析出的日志id
                     "blog_time": None,  # 页面解析出的日志上传时间
-                    "json_data": data,  # 页面解析出的日志上传时间
+                    "json_data": data,  # 原始数据
                 }
                 if len(data) >= 2 and robot.check_sub_key(("113305016",), data[1]) and len(data[1]["113305016"]) == 1 and len(data[1]["113305016"][0]) >= 5:
+                    # 获取日志id
                     extra_blog_info["blog_id"] = str(data[1]["113305016"][0][0])
-                    if isinstance(data[1]["113305016"][0][4], long):
-                        extra_blog_info["blog_time"] = int(data[1]["113305016"][0][4] / 1000)
+                    # 获取日志创建时间
+                    if robot.is_integer(data[1]["113305016"][0][4]):
+                        extra_blog_info["blog_time"] = int(int(data[1]["113305016"][0][4]) / 1000)
                 extra_info["blog_info_list"].append(extra_blog_info)
-        extra_info["key"] = str(script_data[2])
+        extra_info["next_page_key"] = str(script_data[2])
     index_page_response.extra_info = extra_info
     return index_page_response
 
@@ -90,7 +92,7 @@ def get_blog_page(account_id, picasaweb_url):
         }
         if blog_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
             album_id = tool.find_sub_string(blog_page_response.data, 'href="https://get.google.com/albumarchive/pwa/%s/album/' % account_id, '"')
-            if album_id.isdigit():
+            if album_id and robot.is_integer(album_id):
                 extra_info["album_id"] = str(album_id)
         # 如果status==500，重试最多5次
         elif blog_page_response.status == 500 and retry_count < 5:
@@ -128,7 +130,7 @@ def get_album_page(account_id, album_id):
                 while continue_token:
                     continue_image_page_url = "https://get.google.com/_/AlbumArchiveUi/data"
                     post_data = {"f.req": '[[[113305010,[{"113305010":["%s",null,24,"%s"]}],null,null,0]]]' % (user_key, continue_token)}
-                    continue_image_page_response = net.http_request(continue_image_page_url, post_data=post_data, encode_multipart=False)
+                    continue_image_page_response = net.http_request(continue_image_page_url, method="POST", post_data=post_data, encode_multipart=False)
                     if continue_image_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
                         continue_data = tool.find_sub_string(continue_image_page_response.data, ")]}'", None).strip()
                         try:
@@ -334,8 +336,8 @@ class Download(threading.Thread):
                         break
 
                 if not is_over:
-                    if index_page_response.extra_info["key"]:
-                        key = index_page_response.extra_info["key"]
+                    if index_page_response.extra_info["next_page_key"]:
+                        key = index_page_response.extra_info["next_page_key"]
                     else:
                         # 不是第一次下载
                         if self.account_info[2] != "0":

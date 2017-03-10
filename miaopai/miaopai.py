@@ -46,10 +46,10 @@ def get_follow_list(suid):
 # 获取用户的suid，作为查找指定用户的视频页的凭证
 # account_id -> mi9wmdhhof
 def get_user_id(account_id):
-    index_page_url = "http://www.miaopai.com/u/paike_%s" % account_id
+    index_page_url = "http://www.miaopai.com/u/paike_%s/relation/follow.htm" % account_id
     index_page_response = net.http_request(index_page_url)
     if index_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-        user_id = tool.find_sub_string(index_page_response.data, '<button class="guanzhu gz" suid="', '" heade="1" token="">+关注</button>')
+        user_id = tool.find_sub_string(index_page_response.data, '<button class="guanzhu gz" suid="', '" heade="1" token="')
         if user_id:
             return user_id
     return None
@@ -64,10 +64,12 @@ def get_one_page_video(suid, page_count):
     extra_info = {
         "is_error": False,  # 是不是格式不符合
         "video_id_list": [],  # 页面解析出的所有视频id
+        "is_over": False  # 是不是最后一页视频
     }
     if index_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         # 获取页面中的所有视频id列表
         if robot.check_sub_key(("isall", "msg"), index_page_response.json_data):
+            extra_info["is_over"] = bool(index_page_response.json_data["isall"])
             video_id_list = re.findall('data-scid="([^"]*)"', index_page_response.json_data["msg"])
             extra_info["video_id_list"] = map(str, video_id_list)
         else:
@@ -209,6 +211,10 @@ class Download(threading.Thread):
                     log.error(account_name + " 第%s页视频解析失败" % page_count)
                     tool.process_exit()
 
+                # 没有视频了
+                if index_page_response.extra_info["is_over"] and len(index_page_response.extra_info["video_id_list"]) == 0:
+                    break
+
                 if len(index_page_response.extra_info["video_id_list"]) == 0:
                     log.error(account_name + " 第%s页没有找到视频" % page_count)
                     tool.process_exit()
@@ -266,10 +272,7 @@ class Download(threading.Thread):
                         break
 
                 if not is_over:
-                    if index_page_response.json_data["isall"]:
-                        is_over = True
-                    else:
-                        page_count += 1
+                    page_count += 1
 
             log.step(account_name + " 下载完毕，总共获得%s个视频" % (video_count - 1))
 

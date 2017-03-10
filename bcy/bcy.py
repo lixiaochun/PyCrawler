@@ -50,10 +50,10 @@ def check_login():
 # 从控制台输入获取账号信息
 def get_account_info_from_console():
     while True:
-        email = raw_input(tool.get_time() + " 请输入邮箱: ")
-        password = raw_input(tool.get_time() + " 请输入密码: ")
+        email = tool.console_input(tool.get_time() + " 请输入邮箱: ")
+        password = tool.console_input(tool.get_time() + " 请输入密码: ")
         while True:
-            input_str = raw_input(tool.get_time() + " 是否使用这些信息(Y)es或重新输入(N)o: ")
+            input_str = tool.console_input(tool.get_time() + " 是否使用这些信息(Y)es或重新输入(N)o: ")
             input_str = input_str.lower()
             if input_str in ["y", "yes"]:
                 return email, password
@@ -90,7 +90,7 @@ def login():
 def follow(account_id):
     follow_page_url = "http://bcy.net/weibo/Operate/follow?"
     follow_post_data = {"uid": account_id, "type": "dofollow"}
-    follow_page_response = net.http_request(follow_page_url, post_data=follow_post_data)
+    follow_page_response = net.http_request(follow_page_url, method="POST", post_data=follow_post_data)
     if follow_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         # 0 未登录，11 关注成功，12 已关注
         if int(follow_page_response.data) == 12:
@@ -102,7 +102,7 @@ def follow(account_id):
 def unfollow(account_id):
     unfollow_page_url = "http://bcy.net/weibo/Operate/follow?"
     unfollow_post_data = {"uid": account_id, "type": "unfollow"}
-    unfollow_page_response = net.http_request(unfollow_page_url, post_data=unfollow_post_data)
+    unfollow_page_response = net.http_request(unfollow_page_url, method="POST", post_data=unfollow_post_data)
     if unfollow_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         if int(unfollow_page_response.data) == 1:
             return True
@@ -198,7 +198,7 @@ class Bcy(robot.Robot):
         # 未登录时提示可能无法获取粉丝指定的作品
         if not check_login():
             while True:
-                input_str = raw_input(tool.get_time() + " 没有检测到您的账号信息，可能无法获取那些只对粉丝开放的隐藏作品，是否手动输入账号密码登录(Y)es？ 或者跳过登录继续程序(C)ontinue？或者退出程序(E)xit？:")
+                input_str = tool.console_input(tool.get_time() + " 没有检测到您的账号信息，可能无法获取那些只对粉丝开放的隐藏作品，是否手动输入账号密码登录(Y)es？ 或者跳过登录继续程序(C)ontinue？或者退出程序(E)xit？:")
                 input_str = input_str.lower()
                 if input_str in ["y", "yes"]:
                     if login():

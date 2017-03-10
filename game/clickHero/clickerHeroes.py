@@ -7,6 +7,7 @@ email: hikaru870806@hotmail.com
 """
 from common import keyboardEvent
 import pywintypes
+import sys
 import win32api
 import win32con
 import win32gui
@@ -45,27 +46,52 @@ PROCESS_STATUS = PROCESS_STATUS_RUN  # 当前进程状态
 # 设置暂停状态
 def pause_process():
     global PROCESS_STATUS
-    print "pause process"
-    PROCESS_STATUS = PROCESS_STATUS_PAUSE
+    if PROCESS_STATUS != PROCESS_STATUS_PAUSE:
+        print_msg("pause process")
+        PROCESS_STATUS = PROCESS_STATUS_PAUSE
 
 
 # 设置运行状态
 def continue_process():
     global PROCESS_STATUS
-    print "continue process"
-    PROCESS_STATUS = PROCESS_STATUS_RUN
+    if PROCESS_STATUS != PROCESS_STATUS_RUN:
+        print_msg("continue process")
+        PROCESS_STATUS = PROCESS_STATUS_RUN
 
 
-class ClickerHeroes():
+# 输出文字
+def print_msg(msg):
+    # 终端输出编码
+    output_encoding = sys.stdout.encoding
+    if output_encoding == "utf-8":
+        print msg
+    else:
+        print msg.decode("utf-8").encode(output_encoding)
+
+
+# 控制台输入
+def console_input(msg):
+    output_encoding = sys.stdout.encoding
+    if output_encoding != "utf-8":
+        msg = msg.decode("utf-8").encode(output_encoding)
+    return raw_input(msg)
+
+
+class ClickerHeroes:
+    window_title = "Clicker Heroes"
+
+    @property
+    def window_handle(self):
+        return win32gui.FindWindow(None, self.window_title)
+
     def __init__(self):
-        windows_title = "Clicker Heroes"
-        self.window_handle = win32gui.FindWindow(None, windows_title)
         # 设置为默认窗口大小（避免坐标产生偏移）
         self.set_window_size(DEFAULT_WINDOWS_SIZE[0], DEFAULT_WINDOWS_SIZE[1])
         keyboard_event_bind = {"Prior": pause_process, "Next": continue_process}
         keyboard_control_thread = keyboardEvent.KeyboardEvent(keyboard_event_bind)
         keyboard_control_thread.setDaemon(True)
         keyboard_control_thread.start()
+        print_msg("开始运行，键盘按下pageUp按钮暂停，pageOn按钮继续")
 
     # 获取窗口大小
     def get_window_size(self):
@@ -123,7 +149,7 @@ class ClickerHeroes():
     def get_color(self, pos_x, pos_y):
         try:
             color = win32gui.GetPixel(win32gui.GetDC(self.window_handle), pos_x, pos_y)
-        except pywintypes.error, e:
+        except pywintypes.error:
             return None, None, None
         red = color & 255
         green = (color >> 8) & 255
@@ -137,4 +163,3 @@ class ClickerHeroes():
     # 根据屏幕坐标获取对应窗口坐标
     def get_client_position(self, pos_x, pos_y):
         return win32gui.ScreenToClient(self.window_handle, (pos_x, pos_y))
-
