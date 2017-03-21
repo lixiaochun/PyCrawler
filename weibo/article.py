@@ -43,6 +43,7 @@ def get_home_page(account_id):
     }
     home_page_response = net.http_request(home_page_url, header_list=header_list)
     if home_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
+        # 获取账号page id
         account_page_id = tool.find_sub_string(home_page_response.data, "$CONFIG['page_id']='", "'")
         if account_page_id and robot.is_integer(account_page_id):
             extra_info["account_page_id"] = account_page_id
@@ -156,7 +157,7 @@ class Article(robot.Robot):
             robot.SYS_DOWNLOAD_IMAGE: True,
             robot.SYS_GET_COOKIE: {".sina.com.cn": ("SUB",)},
         }
-        robot.Robot.__init__(self, sys_config, extra_config, use_urllib3=True)
+        robot.Robot.__init__(self, sys_config, extra_config)
 
         # 设置全局变量，供子线程调用
         GET_IMAGE_COUNT = self.get_image_count
