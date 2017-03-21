@@ -118,7 +118,8 @@ def check_image_invalid(file_path):
 # page_id -> 1005052535836307
 def get_one_page_video(account_page_id, since_id):
     # http://weibo.com/p/aj/album/loading?type=video&since_id=9999999999999999&page_id=1005052535836307&page=1&ajax_call=1
-    index_page_url = "http://weibo.com/p/aj/album/loading?type=video&since_id=%s&page_id=%s&page=1&ajax_call=1" % (since_id, account_page_id)
+    index_page_url = "http://weibo.com/p/aj/album/loading"
+    index_page_url += "?type=video&since_id=%s&page_id=%s&page=1&ajax_call=1&__rnd=%s" % (since_id, account_page_id, int(time.time() * 1000))
     header_list = {"cookie": "SUB=" + COOKIE_INFO["SUB"]}
     extra_info = {
         "is_error": False,  # 是不是格式不符合
@@ -135,7 +136,11 @@ def get_one_page_video(account_page_id, since_id):
             page_html = index_page_response.json_data["data"].encode("utf-8")
             # 获取视频播放地址类别
             video_play_url_list = re.findall('<a target="_blank" href="([^"]*)"><div ', page_html)
-            extra_info["video_play_url_list"] = map(str, video_play_url_list)
+            if len(video_play_url_list) == 0:
+                if page_html.find("还没有发布过视频") == -1:
+                    extra_info["is_error"] = True
+            else:
+                extra_info["video_play_url_list"] = map(str, video_play_url_list)
             # 获取下一页视频的指针
             next_page_since_id = tool.find_sub_string(page_html, "type=video&owner_uid=&viewer_uid=&since_id=", '">')
             if robot.is_integer(next_page_since_id):
@@ -162,7 +167,7 @@ def get_video_url(video_play_page_url):
             ):
                 for video_info in video_info_page_response.json_data["result"]:
                     if robot.check_sub_key(("path", "host", "scheme"), video_info):
-                        video_url = video_info["scheme"] + video_info["host"] + video_info["path"]
+                        video_url = str(video_info["scheme"] + video_info["host"] + video_info["path"])
                         break
     # http://video.weibo.com/show?fid=1034:e608e50d5fa95410748da61a7dfa2bff
     elif video_play_page_url.find("video.weibo.com/show?fid=") >= 0:  # 微博视频
@@ -172,7 +177,7 @@ def get_video_url(video_play_page_url):
         if video_play_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
             video_url = tool.find_sub_string(video_play_page_response.data, "video_src=", "&")
             if video_url:
-                video_url = urllib2.unquote(video_url)
+                video_url = str(urllib2.unquote(video_url))
             else:
                 video_url = None
         elif video_play_page_response.status == 404:
@@ -208,7 +213,7 @@ def get_video_url(video_play_page_url):
                 video_info_page_response = net.http_request(video_info_page_url, json_decode=True)
                 if video_info_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
                     if robot.check_sub_key(("data",), video_info_page_response.json_data) and robot.check_sub_key(("url",), video_info_page_response.json_data["data"]):
-                        video_url = random.choice(video_info_page_response.json_data["data"]["url"])
+                        video_url = str(random.choice(video_info_page_response.json_data["data"]["url"]))
     else:  # 其他视频，暂时不支持，收集看看有没有
         log.error("其他第三方视频：" + video_play_page_url)
         video_url = ""
@@ -456,11 +461,6 @@ class Download(threading.Thread):
                         first_video_url = ""  # 存档恢复
                         break
 
-                    if len(index_page_response.extra_info["video_play_url_list"]) == 0:
-                        log.error(account_name + " %s后的一页视频%s没有解析到视频地址" % (since_id, index_page_response.json_data))
-                        first_video_url = ""  # 存档恢复
-                        break
-
                     # 匹配获取全部的视频页面
                     log.trace(account_name + "since_id：%s中的全部视频：%s" % (since_id, index_page_response.extra_info["video_play_url_list"]))
 
@@ -495,8 +495,6 @@ class Download(threading.Thread):
                             need_make_video_dir = False
 
                         video_file_path = os.path.join(video_path, "%04d.mp4" % video_count)
-                        a = net.http_request(video_url, method="HEAD")
-                        print a.headers
                         save_return = net.save_net_file(video_url, video_file_path)
                         if save_return["status"] == 1:
                             log.step(account_name + " 第%s个视频下载成功" % video_count)
