@@ -51,8 +51,33 @@ def set_proxy(ip, port):
     tool.print_msg("设置代理成功")
 
 
+# 根据传入cookie key和value，生成一个放入header中的cookie字符串
+# {"cookie1":“value1", "cookie2":“value2"} -> cookie1=value1; cookie2=value2
+def build_header_cookie_string(cookies_list):
+    if not cookies_list:
+        return ""
+    temp_string = []
+    for cookie_name in cookies_list:
+        temp_string.append(cookie_name + "=" + cookies_list[cookie_name])
+    return "; ".join(temp_string)
+
+
+# 从请求返回的set-cookie字段解析出全部的cookies内容字典
+def get_cookies_from_response_header(response_headers):
+    if not isinstance(response_headers, urllib3._collections.HTTPHeaderDict):
+        return {}
+    if "Set-Cookie" not in response_headers:
+        return {}
+    cookies_list = {}
+    for cookie in response_headers.getlist("Set-Cookie"):
+        cookie_name, cookie_value = cookie.split(";")[0].split("=", 1)
+        cookies_list[cookie_name] = cookie_value
+    return cookies_list
+
+
 # http请求(urlib3)
 # header_list       http header信息，e.g. {"Host":“www.example.com"}
+# cookies_list      cookie信息，e.g. {"cookie1":“value1", "cookie2":“value2"}
 # is_random_ip      是否使用伪造IP
 # exception_return  如果异常信息中包含以下字符串，直接返回-1
 # return            0：无法访问
@@ -60,8 +85,8 @@ def set_proxy(ip, port):
 #                   -2：json decode error
 #                   -10：特殊异常捕获后的返回
 #                   其他>0：网页返回码（正常返回码为200）
-def http_request(url, method="GET", post_data=None, header_list=None, connection_timeout=HTTP_CONNECTION_TIMEOUT, read_timeout=HTTP_CONNECTION_TIMEOUT, is_random_ip=True,
-                 json_decode=False, encode_multipart=False, redirect=True, exception_return=""):
+def http_request(url, method="GET", post_data=None, header_list=None, cookies_list=None, connection_timeout=HTTP_CONNECTION_TIMEOUT,
+                 read_timeout=HTTP_CONNECTION_TIMEOUT, is_random_ip=True, json_decode=False, encode_multipart=False, redirect=True, exception_return=""):
     if not (url.find("http://") == 0 or url.find("https://") == 0):
         return ErrorResponse(HTTP_RETURN_CODE_URL_INVALID)
     method = method.upper()
@@ -87,7 +112,11 @@ def http_request(url, method="GET", post_data=None, header_list=None, connection
         if is_random_ip:
             random_ip = _random_ip_address()
             header_list["X-Forwarded-For"] = random_ip
-            header_list["x-Real-Ip"] = random_ip
+            header_list["X-Real-Ip"] = random_ip
+
+        # 设置cookie
+        if cookies_list:
+            header_list["Cookie"] = build_header_cookie_string(cookies_list)
 
         try:
             if connection_timeout == 0 and read_timeout == 0:
@@ -201,11 +230,11 @@ def _random_ip_address():
 #       code:   -1：无法访问（没有获得返回，可能是域名无法解析，请求被直接丢弃，地址被墙等）
 #               -2：下载失败（访问没有问题，但下载后与源文件大小不一致，网络问题）
 #               > 0：访问出错，对应url的http code
-def save_net_file(file_url, file_path, need_content_type=False, header_list=None):
+def save_net_file(file_url, file_path, need_content_type=False, header_list=None, cookies_list=None):
     file_path = tool.change_path_encoding(file_path)
     create_file = False
     for retry_count in range(0, 5):
-        response = http_request(file_url, header_list=header_list, read_timeout=60)
+        response = http_request(file_url, header_list=header_list, cookies_list=cookies_list, read_timeout=60)
         if response.status == HTTP_RETURN_CODE_SUCCEED:
             # response中的Content-Type作为文件后缀名
             if need_content_type and "Content-Type" in response.headers:

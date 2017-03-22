@@ -33,14 +33,15 @@ def check_login():
     header_list = {"LOGGED_USER": COOKIE_INFO["LOGGED_USER"]}
     index_page_url = "http://bcy.net/"
     index_page_response = net.http_request(index_page_url, header_list=header_list)
-    if index_page_response.status == net.HTTP_RETURN_CODE_SUCCEED and "Set-Cookie" in index_page_response.headers:
-        COOKIE_INFO["acw_tc"] = tool.find_sub_string(index_page_response.headers["Set-Cookie"], "acw_tc=", ";")
-        COOKIE_INFO["PHPSESSID"] = tool.find_sub_string(index_page_response.headers["Set-Cookie"], "PHPSESSID=", ";")
+    if index_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
+        set_cookie = net.get_cookies_from_response_header(index_page_response.headers)
+        if "acw_tc" in set_cookie and "PHPSESSID" in set_cookie:
+            COOKIE_INFO["acw_tc"] = set_cookie["acw_tc"]
+            COOKIE_INFO["PHPSESSID"] = set_cookie["PHPSESSID"]
     if not COOKIE_INFO["acw_tc"] or not COOKIE_INFO["PHPSESSID"]:
         return False
     home_page_url = "http://bcy.net/home/user/index"
-    header_list = {"Cookie": "LOGGED_USER=%s; acw_tc=%s; PHPSESSID=%s" % (COOKIE_INFO["LOGGED_USER"], COOKIE_INFO["acw_tc"], COOKIE_INFO["PHPSESSID"])}
-    home_page_response = net.http_request(home_page_url, header_list=header_list)
+    home_page_response = net.http_request(home_page_url, cookies_list=COOKIE_INFO)
     if home_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         if home_page_response.data.find('<a href="/login">登录</a>') == -1:
             return True
@@ -69,17 +70,21 @@ def login():
     # 访问首页，获取一个随机session id
     home_page_url = "http://bcy.net/home/user/index"
     home_page_response = net.http_request(home_page_url)
-    if home_page_response.status == net.HTTP_RETURN_CODE_SUCCEED and "Set-Cookie" in home_page_response.headers:
-        COOKIE_INFO["acw_tc"] = tool.find_sub_string(home_page_response.headers["Set-Cookie"], "acw_tc=", ";")
-        COOKIE_INFO["PHPSESSID"] = tool.find_sub_string(home_page_response.headers["Set-Cookie"], "PHPSESSID=", ";")
+    if home_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
+        set_cookie = net.get_cookies_from_response_header(home_page_response.headers)
+        if "acw_tc" in set_cookie and "PHPSESSID" in set_cookie:
+            COOKIE_INFO["acw_tc"] = set_cookie["acw_tc"]
+            COOKIE_INFO["PHPSESSID"] = set_cookie["PHPSESSID"]
+        else:
+            return False
     else:
         return False
     # 从命令行中输入账号密码
     email, password = get_account_info_from_console()
     login_url = "http://bcy.net/public/dologin"
     login_post = {"email": email, "password": password}
-    header_list = {"Cookie": "acw_tc=%s; PHPSESSID=%s; mobile_set=no" % (COOKIE_INFO["acw_tc"], COOKIE_INFO["PHPSESSID"])}
-    login_response = net.http_request(login_url, login_post, header_list=header_list)
+    cookies_list = {"acw_tc": COOKIE_INFO["acw_tc"], "PHPSESSID": COOKIE_INFO["PHPSESSID"]}
+    login_response = net.http_request(login_url, login_post, cookies_list=cookies_list)
     if login_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         if login_response.data.find('<a href="/login">登录</a>') == -1:
             return True
@@ -151,8 +156,7 @@ def get_one_page_album(account_id, page_count):
 def get_album_page(coser_id, album_id):
     # http://bcy.net/coser/detail/9299/36484
     album_page_url = "http://bcy.net/coser/detail/%s/%s" % (coser_id, album_id)
-    header_list = {"Cookie": "acw_tc=%s; PHPSESSID=%s; mobile_set=no" % (COOKIE_INFO["acw_tc"], COOKIE_INFO["PHPSESSID"])}
-    album_page_response = net.http_request(album_page_url, header_list=header_list)
+    album_page_response = net.http_request(album_page_url, cookies_list=COOKIE_INFO)
     extra_info = {
         "is_admin_locked": False,  # 是否被管理员锁定
         "is_only_follower": False,  # 是否只显示给粉丝
