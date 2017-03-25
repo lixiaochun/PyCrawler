@@ -120,7 +120,7 @@ class MiaoPai(robot.Robot):
 
         # 解析存档文件
         # account_id  video_count  last_video_url
-        account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0", ""])
+        account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "", ""])
         ACCOUNTS = account_list.keys()
 
         # 循环下载每个id
@@ -213,6 +213,8 @@ class Download(threading.Thread):
 
                 # 没有视频了
                 if index_page_response.extra_info["is_over"] and len(index_page_response.extra_info["video_id_list"]) == 0:
+                    if self.account_info[2] != "":
+                        log.error(account_name + " 没有找到上次下载的最后一个视频地址")
                     break
 
                 if len(index_page_response.extra_info["video_id_list"]) == 0:
@@ -225,7 +227,7 @@ class Download(threading.Thread):
                     video_id = str(video_id)
 
                     # 检查是否已下载到前一次的图片
-                    if first_video_id == self.account_info[2]:
+                    if video_id == self.account_info[2]:
                         is_over = True
                         break
 
