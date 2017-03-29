@@ -78,14 +78,6 @@ def get_one_page_photo(account_id, page_count):
     return index_page_response
 
 
-# 检测图片是不是被微博自动删除的文件
-def check_image_invalid(file_path):
-    file_md5 = tool.get_file_md5(file_path)
-    if file_md5 in ["14f2559305a6c96608c474f4ca47e6b0", "37b9e6dec174b68a545c852c63d4645a"]:
-        return True
-    return False
-
-
 # 获取一页的视频信息
 # page_id -> 1005052535836307
 def get_one_page_video(account_page_id, since_id):
@@ -391,15 +383,15 @@ class Download(threading.Thread):
                     if file_type.find("/") != -1:
                         file_type = "jpg"
                     image_file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
-                    save_return = net.save_net_file(image_info["image_url"], image_file_path)
-                    if save_return["status"] == 1:
-                        if check_image_invalid(image_file_path):
+                    save_file_return = net.save_net_file(image_info["image_url"], image_file_path)
+                    if save_file_return["status"] == 1:
+                        if weiboCommon.check_image_invalid(image_file_path):
                             log.error(account_name + " 第%s张图片 %s 资源已被删除，跳过" % (image_count, image_info["image_url"]))
                         else:
                             log.step(account_name + " 第%s张图片下载成功" % image_count)
                             image_count += 1
                     else:
-                        log.error(account_name + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_info["image_url"], robot.get_save_net_file_failed_reason(save_return["code"])))
+                        log.error(account_name + " 第%s张图片 %s 下载失败，原因：%s" % (image_count, image_info["image_url"], robot.get_save_net_file_failed_reason(save_file_return["code"])))
 
                     # 达到配置文件中的下载数量，结束
                     if 0 < GET_IMAGE_COUNT < image_count:
@@ -478,12 +470,12 @@ class Download(threading.Thread):
                             need_make_video_dir = False
 
                         video_file_path = os.path.join(video_path, "%04d.mp4" % video_count)
-                        save_return = net.save_net_file(video_url, video_file_path)
-                        if save_return["status"] == 1:
+                        save_file_return = net.save_net_file(video_url, video_file_path)
+                        if save_file_return["status"] == 1:
                             log.step(account_name + " 第%s个视频下载成功" % video_count)
                             video_count += 1
                         else:
-                            log.error(account_name + " 第%s个视频 %s（%s) 下载失败" % (video_count, video_play_page_url, video_url))
+                            log.error(account_name + " 第%s个视频 %s（%s) 下载失败，原因：%s" % (video_count, video_play_page_url, video_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
 
                         # 达到配置文件中的下载数量，结束
                         if 0 < GET_VIDEO_COUNT < video_count:
