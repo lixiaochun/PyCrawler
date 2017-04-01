@@ -135,11 +135,12 @@ def get_video_url(video_play_page_url):
                         break
     # http://video.weibo.com/show?fid=1034:e608e50d5fa95410748da61a7dfa2bff
     elif video_play_page_url.find("video.weibo.com/show?fid=") >= 0:  # 微博视频
-        # 多次尝试，在多线程访问的时候有较大几率无法返回正确的信息
         cookies_list = {"SUB": COOKIE_INFO["SUB"]}
         video_play_page_response = net.http_request(video_play_page_url, cookies_list=cookies_list)
         if video_play_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
             video_url = tool.find_sub_string(video_play_page_response.data, "video_src=", "&")
+            if not video_url:
+                video_url = tool.find_sub_string(video_play_page_response.data, 'flashvars="list=', '"')
             if video_url:
                 video_url = str(urllib2.unquote(video_url))
             else:
@@ -455,7 +456,7 @@ class Download(threading.Thread):
                         video_url = get_video_url(video_play_page_url)
                         if video_url is None:
                             log.error(account_name + " 第%s个视频 %s 没有解析到下载地址" % (video_count, video_play_page_url))
-                            break
+                            continue
 
                         if video_url is "":
                             continue
@@ -498,7 +499,7 @@ class Download(threading.Thread):
 
             # 排序
             if IS_SORT:
-                if image_count > 1:
+                if first_image_time != "0":
                     log.step(account_name + " 图片开始从下载目录移动到保存目录")
                     destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
                     if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
@@ -506,7 +507,7 @@ class Download(threading.Thread):
                     else:
                         log.error(account_name + " 创建图片保存目录 %s 失败" % destination_path)
                         tool.process_exit()
-                if video_count > 1:
+                if first_video_url != "":
                     log.step(account_name + " 视频开始从下载目录移动到保存目录")
                     destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
                     if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
