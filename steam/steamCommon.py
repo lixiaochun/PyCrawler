@@ -7,8 +7,81 @@ email: hikaru870806@hotmail.com
 """
 from common import net, robot, tool
 from pyquery import PyQuery as pq
+import json
 import os
 import re
+
+
+# 获取指定账号的全部游戏ud列表
+def get_account_owned_app_list(user_id):
+    game_index_page_url = "http://steamcommunity.com/profiles/%s/games/?tab=all" % user_id
+    game_index_page_response = net.http_request(game_index_page_url)
+    if game_index_page_response.status != net.HTTP_RETURN_CODE_SUCCEED:
+        tool.print_msg("所有游戏页访问失败")
+        tool.process_exit()
+    owned_all_game_data = tool.find_sub_string(game_index_page_response.data, "var rgGames = ", ";")
+    try:
+        owned_all_game_data = json.loads(owned_all_game_data)
+    except ValueError:
+        tool.print_msg("所有游戏解析失败")
+        tool.process_exit()
+    app_id_list = []
+    for game_data in owned_all_game_data:
+        if "appid" in game_data:
+            app_id_list.append(str(game_data["appid"]))
+    return app_id_list
+
+
+# 获取所有正在打折的游戏列表
+def get_discount_game_list():
+    page_count = 1
+    discount_game_list = []
+    app_id_list = []
+    while True:
+        discount_game_page_url = "http://store.steampowered.com/search/results?sort_by=Price_ASC&category1=21,997,998&os=win&specials=1&page=%s" % page_count
+        discount_game_page_response = net.http_request(discount_game_page_url)
+        if discount_game_page_response.status != net.HTTP_RETURN_CODE_SUCCEED:
+            tool.print_msg("第%s页打折游戏列表访问失败" % page_count)
+            break
+        search_result_selector = pq(discount_game_page_response.data).find("#search_result_container")
+        game_list_selector = search_result_selector.find("div").eq(1).find("a")
+        for game_index in range(0, game_list_selector.size()):
+            game_selector = game_list_selector.eq(game_index)
+            # game app id
+            game_id = game_selector.attr("data-ds-appid")
+            # 过滤那些重复的游戏
+            if game_id in app_id_list:
+                continue
+            app_id_list.append(game_id)
+            # package，包含多个游戏
+            if not robot.is_integer(game_id) and game_id.find(",") >= 0:
+                game_id = game_id.split(",")
+            # discount
+            discount = filter(str.isdigit, game_selector.find(".search_discount span").text().encode("utf-8"))
+            # old price
+            old_price = filter(str.isdigit, game_selector.find(".search_price span strike").text().encode("utf-8"))
+            # now price
+            now_price = filter(str.isdigit, game_selector.find(".search_price").remove("span").text().encode("utf-8"))
+            # 如果没有取到，给个默认值
+            if not robot.is_integer(old_price):
+                old_price = 0
+            if not robot.is_integer(now_price):
+                now_price = 0
+            if not robot.is_integer(discount):
+                discount = int(now_price / old_price * 100)
+            discount_info = {"game_id": game_id, "discount": int(discount), "old_price": int(old_price), "now_price": int(now_price)}
+            if game_selector.attr("data-ds-packageid"):
+                discount_info["package_id"] = game_selector.attr("data-ds-packageid")
+            discount_game_list.append(discount_info)
+        pagination_html = search_result_selector.find(".search_pagination .search_pagination_right").html().encode("utf-8")
+        page_count_find = re.findall("<a [\s|\S]*?>([\d]*)</a>", pagination_html)
+        total_page_count = max(map(int, page_count_find))
+        if page_count < total_page_count:
+            page_count += 1
+        else:
+            break
+    # [{'game_id': '299720', 'now_price': '1', 'old_price': '6', 'discount': '83'}, {'game_id': '485450', 'now_price': '1', 'old_price': '7', 'discount': '86'}]
+    return discount_game_list
 
 
 # 获取所有已经没有剩余卡牌掉落且还没有收集完毕的徽章详细地址
@@ -95,7 +168,6 @@ def get_market_game_trade_card_price(game_id, login_cookie):
     if "success" in market_search_page_response.json_data and market_search_page_response.json_data["success"] and "results_html" in market_search_page_response.json_data:
         card_selector = pq(market_search_page_response.json_data["results_html"]).find(".market_listing_row_link")
         for index in range(0, card_selector.size()):
-            # print card_selector.eq(index).html()
             card_name = card_selector.eq(index).find(".market_listing_item_name").text()
             card_min_price = card_selector.eq(index).find("span.normal_price span.normal_price").text().encode("utf-8").replace("¥ ", "")
             market_item_list[card_name] = card_min_price
@@ -118,6 +190,16 @@ def get_login_cookie_from_browser():
     if "store.steampowered.com" in all_cookie_from_browser:
         if "steamLogin" in all_cookie_from_browser["store.steampowered.com"]:
             return all_cookie_from_browser["store.steampowered.com"]["steamLogin"]
+        else:
+            login_url = "https://store.steampowered.com/login/checkstoredlogin/?redirectURL="
+            cookies_list = all_cookie_from_browser["store.steampowered.com"]
+            login_response = net.http_request(login_url, cookies_list=cookies_list, redirect=False)
+            if login_response.status == 302:
+                set_cookies = net.get_cookies_from_response_header(login_response.headers)
+                if "steamLogin" in set_cookies:
+                    return set_cookies["steamLogin"]
+            else:
+                tool.print_msg("登录失败")
     tool.print_msg("登录cookie获取失败")
     tool.process_exit()
     return None
