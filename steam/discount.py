@@ -60,4 +60,4 @@ def main(account_id, min_discount_percent, min_discount_price):
 
 
 if __name__ == "__main__":
-    main(76561198172925593, 90, 1)
+    main(steamCommon.get_account_id_from_file(), 90, 1)

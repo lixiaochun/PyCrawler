@@ -25,13 +25,16 @@ IS_DOWNLOAD_IMAGE = True
 
 # 获取账号首页
 def get_home_page(account_name):
-    home_page_url = "https://%s.tuchong.com" % account_name
+    if robot.is_integer(account_name):
+        home_page_url = "https://www.tuchong.com/%s" % account_name
+    else:
+        home_page_url = "https://%s.tuchong.com" % account_name
     home_page_url_response = net.http_request(home_page_url)
     extra_info = {
         "account_id": None,  # account id（字母账号->数字账号)
     }
     if home_page_url_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-        extra_info["account_id"] = tool.find_sub_string(home_page_url_response.data, '<div class="time-line" data-site-id="', '">')
+        extra_info["account_id"] = tool.find_sub_string(home_page_url_response.data, 'site_id":"', '",')
     home_page_url_response.extra_info = extra_info
     return home_page_url_response
 
@@ -52,10 +55,10 @@ def get_one_page_album(account_id, post_time):
         if robot.check_sub_key(("posts", "result"), index_page_response.json_data) and index_page_response.json_data["result"] == "SUCCESS":
             for album_info in index_page_response.json_data["posts"]:
                 extra_image_info = {
-                    "album_id": None, # 页面解析出的相册id
+                    "album_id": None,  # 页面解析出的相册id
                     "album_time": None,  # 页面解析出的相册创建时间
-                    "album_title": "", # 页面解析出的相册标题
-                    "image_url_list": [], # 页面解析出的图片地址列表
+                    "album_title": "",  # 页面解析出的相册标题
+                    "image_url_list": [],  # 页面解析出的图片地址列表
                     "json_data": album_info,  # 原始数据
                 }
                 if robot.check_sub_key(("title", "post_id", "published_at", "images"), album_info):
