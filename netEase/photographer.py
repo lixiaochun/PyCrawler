@@ -17,6 +17,7 @@ import traceback
 ACCOUNTS = []
 TOTAL_IMAGE_COUNT = 0
 GET_IMAGE_COUNT = 0
+GET_PAGE_COUNT = 0
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
 
@@ -62,9 +63,10 @@ def get_album_page(album_page_url):
     return album_page_response
 
 
-class PP(robot.Robot):
+class Photographer(robot.Robot):
     def __init__(self):
         global GET_IMAGE_COUNT
+        global GET_PAGE_COUNT
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
         global IS_SORT
@@ -76,6 +78,7 @@ class PP(robot.Robot):
 
         # 设置全局变量，供子线程调用
         GET_IMAGE_COUNT = self.get_image_count
+        GET_PAGE_COUNT = self.get_page_count
         IMAGE_DOWNLOAD_PATH = self.image_download_path
         IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
@@ -154,6 +157,7 @@ class Download(threading.Thread):
 
             # 下载
             total_image_count = 0
+            album_count = 0
             first_album_id = "0"
             need_make_download_dir = True
             image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
@@ -205,7 +209,7 @@ class Download(threading.Thread):
                     log.step(account_name + " 相册%s 《%s》 开始下载第%s张图片 %s" % (album_id, album_title, image_count, image_url))
 
                     file_type = image_url.split(".")[-1]
-                    file_path = os.path.join(album_path, "%04d.%s" % (image_count, file_type))
+                    file_path = os.path.join(album_path, "%03d.%s" % (image_count, file_type))
                     save_file_return = net.save_net_file(image_url, file_path)
                     if save_file_return["status"] == 1:
                         log.step(account_name + " 相册%s 《%s》 第%s张图片下载成功" % (album_id, album_title, image_count))
@@ -213,6 +217,13 @@ class Download(threading.Thread):
                     else:
                         log.error(account_name + " 相册%s 《%s》 第%s张图片 %s 下载失败，原因：%s" % (album_id, album_title, image_count, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
                 total_image_count += image_count - 1
+                album_count += 1
+
+                # 达到配置文件中的下载数量，结束
+                if 0 < GET_IMAGE_COUNT < total_image_count:
+                    break
+                if 0 < GET_PAGE_COUNT <= album_count:
+                    break
 
             log.step(account_name + " 下载完毕，总共获得%s张图片" % total_image_count)
 
@@ -239,4 +250,4 @@ class Download(threading.Thread):
 
 
 if __name__ == "__main__":
-    PP().main()
+    Photographer().main()
