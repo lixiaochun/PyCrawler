@@ -5,7 +5,7 @@ RevfromDVLkanna	596	0	1465216765	橋本環奈	404
 yukos_cook	1380	0	菅本裕子	保护
 smallstonechan	204	0	1458572402	小石公美子	保护
 rei_kusakusa	0	0	山田澪花	保护get
-nahachi_078	702	0	1460556747	肉球あやとさん	保护
+nahachi_078	702	0	1460556747	肉球あやとさん	404
 aoki_shiori	0	0	0	青木詩織	保护
 isoharakyoka	117	1454287477	磯原杏華	404
 arisa_m_0720	926	0	582934379279749121	三浦亜莉沙	404
