@@ -292,20 +292,22 @@ class Download(threading.Thread):
             need_make_image_dir = True
             need_make_video_dir = True
             while not is_over:
-                log.step(account_name + " 开始解析%s后的一页媒体列表" % position_blog_id)
+                log.step(account_name + " 开始解析position %s后的一页媒体列表" % position_blog_id)
 
                 # 获取指定时间点后的一页图片信息
                 media_page_response = get_media_page_data(account_name, position_blog_id)
                 if media_page_response.status != net.HTTP_RETURN_CODE_SUCCEED:
-                    log.error(account_name + " %s后的一页媒体列表访问失败，原因：%s" % (position_blog_id, robot.get_http_request_failed_reason(media_page_response.status)))
+                    log.error(account_name + " position %s后的一页媒体列表访问失败，原因：%s" % (position_blog_id, robot.get_http_request_failed_reason(media_page_response.status)))
                     tool.process_exit()
 
                 if media_page_response.extra_info["is_error"]:
-                    log.error(account_name + " %s后的一页媒体列表解析失败" % position_blog_id)
+                    log.error(account_name + " position %s后的一页媒体列表解析失败" % position_blog_id)
                     tool.process_exit()
 
                 if media_page_response.extra_info["is_over"]:
                     break
+
+                log.step(account_name + " position %s后一页解析的所有媒体信息：%s" % (position_blog_id, media_page_response.extra_info["media_info_list"]))
 
                 for media_info in media_page_response.extra_info["media_info_list"]:
                     if media_info["blog_id"] is None:
@@ -315,7 +317,7 @@ class Download(threading.Thread):
                     log.step(account_name + " 开始解析日志 %s" % media_info["blog_id"])
 
                     # 检查是否tweet的id小于上次的记录
-                    if int(media_info["blog_id"]) <= int(self.account_info[3]):
+                    if int(media_info["blog_id"]) <= int(self.account_info[4]):
                         is_over = True
                         break
 
@@ -411,7 +413,7 @@ class Download(threading.Thread):
                 if image_count > 1:
                     log.step(account_name + " 图片开始从下载目录移动到保存目录")
                     destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-                    if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
+                    if robot.sort_file(image_path, destination_path, int(self.account_info[2]), 4):
                         log.step(account_name + " 图片从下载目录移动到保存目录成功")
                     else:
                         log.error(account_name + " 创建图片子目录 %s 失败" % destination_path)
@@ -419,7 +421,7 @@ class Download(threading.Thread):
                 if video_count > 1:
                     log.step(account_name + " 视频开始从下载目录移动到保存目录")
                     destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-                    if robot.sort_file(video_path, destination_path, int(self.account_info[2]), 4):
+                    if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
                         log.step(account_name + " 视频从下载目录移动到保存目录成功")
                     else:
                         log.error(account_name + " 创建视频保存目录 %s 失败" % destination_path)
