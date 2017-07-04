@@ -76,10 +76,15 @@ def get_one_page_photo(account_id, cursor):
     if index_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         if (
             robot.check_sub_key(("meta",), index_page_response.json_data) and
-            robot.check_sub_key(("code",), index_page_response.json_data["meta"]) and
-            index_page_response.json_data["meta"]["code"] == "NoMoreDataError"
+            robot.check_sub_key(("code",), index_page_response.json_data["meta"])
         ):
-            extra_info["is_over"] = True
+            if index_page_response.json_data["meta"]["code"] == "NoMoreDataError":
+                extra_info["is_over"] = True
+            elif index_page_response.json_data["meta"]["code"] == "TooManyRequests":
+                time.sleep(30)
+                return get_one_page_photo(account_id, cursor)
+            else:
+                extra_info["is_error"] = True
         elif robot.check_sub_key(("data", "next"), index_page_response.json_data):
             for media_info in index_page_response.json_data["data"]:
                 media_extra_info = {
@@ -148,6 +153,9 @@ class Yasaxi(robot.Robot):
         }
         robot.Robot.__init__(self, sys_config)
 
+        # 服务器有请求数量限制，所以取消多线程
+        self.thread_count = 1
+
         # 设置全局变量，供子线程调用
         GET_IMAGE_COUNT = self.get_image_count
         GET_VIDEO_COUNT = self.get_video_count
@@ -161,7 +169,6 @@ class Yasaxi(robot.Robot):
 
     def main(self):
         global ACCOUNTS
-        self.thread_count = 1
 
         # 从文件中宏读取账号信息（访问token）
         if not get_token_from_file():
@@ -238,6 +245,8 @@ class Download(threading.Thread):
             need_make_image_dir = True
             # need_make_video_dir = True
             while not is_over:
+                log.step(account_name + " 开始解析cursor '%s'的图片" % cursor)
+
                 index_page_response = get_one_page_photo(account_id, cursor)
                 if index_page_response.status != net.HTTP_RETURN_CODE_SUCCEED:
                     log.error(account_name + " cursor '%s'的图片访问失败，原因：%s" % (cursor, robot.get_http_request_failed_reason(index_page_response.status)))
@@ -263,6 +272,8 @@ class Download(threading.Thread):
                     if first_status_time == "0":
                         first_status_time = str(status_info["time"])
 
+                    log.step(account_name + " 开始解析状态%s的图片" % status_info["id"])
+
                     if IS_DOWNLOAD_IMAGE:
                         for image_url in status_info["image_url_list"]:
                             # 第一张图片，创建目录
@@ -276,7 +287,7 @@ class Download(threading.Thread):
                             resolution = image_url.split("?")[0].split("/")[-2]
                             file_name = file_name_and_type.split(".")[0]
                             file_type = file_name_and_type.split(".")[1]
-                            if file_name[-2:] != "_b" and resolution == "1080" :
+                            if file_name[-2:] != "_b" and resolution == "1080":
                                 image_file_path = os.path.join(image_path, "origin/%s.%s" % (file_name, file_type))
                             else:
                                 image_file_path = os.path.join(image_path, "other/%s.%s" % (file_name, file_type))
