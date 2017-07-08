@@ -17,7 +17,6 @@ maricollet3	2846	0	篠田麻里子
 jeremy_jun	41	0	袁雨桢
 _iamannachan_	39	0	1483700301	入山杏奈
 harunaofficial	331	9	1476783556	木下春奈
-jyriyu	0		松井珠理奈
 ak824	79	10	1490325186	瓜屋茜
 masu_yuka	465	49	1489294882	増田有華
 ainafukumoto	110	3	1490607351	福本愛菜
@@ -26,3 +25,7 @@ yuririn515	450	10	1492956525	市原佑梨
 katorena_official	18	0	1468840010	加藤玲奈
 said_energizer2	1079	345	1489241043
 nyako_mao	10	0	1495979008	Nyako
+unaka_	703	13	1498830739	刘佩鑫
+sakana_lpx				刘佩鑫
+akazawa._.hono				赤澤萌乃
+aina_fukumoto				福本愛菜
