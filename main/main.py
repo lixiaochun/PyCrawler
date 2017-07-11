@@ -123,12 +123,12 @@ def nana_go_go():
     nanaGoGo.NanaGoGo().main()
 
 
-# nico nico
-def nico_nico():
-    from nicoNico import nicoNico
-    nico_nico_path = os.path.join(os.path.abspath(".."), "nicoNico")
-    os.chdir(nico_nico_path)
-    nicoNico.NicoNico().main()
+# 网易摄影
+def netease_photographer():
+    from netEase import photographer
+    netease_photographer_path = os.path.join(os.path.abspath(".."), "netEase")
+    os.chdir(netease_photographer_path)
+    photographer.Photographer().main()
 
 
 # 乃木坂46公式Blog
@@ -232,6 +232,14 @@ def weishi():
     weishi.WeiShi().main()
 
 
+# 看了又看
+def yasaxi():
+    from yasaxi import yasaxi
+    yasaxi_path = os.path.join(os.path.abspath(".."), "yasaxi")
+    os.chdir(yasaxi_path)
+    yasaxi.Yasaxi().main()
+
+
 # 一直播
 def yizhibo():
     from yizhibo import yizhibo
@@ -269,6 +277,7 @@ def zunguang():
 # meituzz()
 # miaopai()
 # nana_go_go()
+# netease_photographer()
 # nogizaka46_blog()
 # shinoda_blog()
 # tuchong()
@@ -276,6 +285,7 @@ def zunguang():
 # twitter()
 # weibo()
 # weibo_article()
+# yasaxi()
 # yizhibo()
 # ywkb()
 # zunguang()
