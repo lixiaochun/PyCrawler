@@ -55,10 +55,10 @@ for item_path, item_position in item_list.items():
             item_index_url = base_host + "/tw/base/legendarygem/"
         else:
             item_index_url = base_host + "/tw/item/%s/legendary.html#page=%s" % (item_path, page_count)
-        item_index_page_response = net.http_request(item_index_url)
-        if item_index_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
+        item_index_response = net.http_request(item_index_url)
+        if item_index_response.status == net.HTTP_RETURN_CODE_SUCCEED:
             # item_index = item_index.decode("utf-8")
-            item_index_page = tool.find_sub_string(item_index_page_response.data, '<div class="cizhui-c-m', '<div class="data-options', 1)
+            item_index_page = tool.find_sub_string(item_index_response.data, '<div class="cizhui-c-m', '<div class="data-options', 1)
             item_index_page = item_index_page.decode("GBK").encode("utf-8")
             item_info_list = re.findall('<tr class="[\s|\S]*?</tr>', item_index_page)
             if len(item_info_list) == 0:
@@ -66,13 +66,13 @@ for item_path, item_position in item_list.items():
             for item_info in item_info_list:
                 if item_info.find('<em class="transmog-s"></em>') >= 0:
                     continue
-                item_page_url = tool.find_sub_string(item_info, '<a href="', '"')
+                item_url = tool.find_sub_string(item_info, '<a href="', '"')
                 item_name = tool.find_sub_string(item_info, 'class="diablo3tip">', "</a>")
                 item_name = item_name.replace("'", "’")
-                item_page_url = base_host + item_page_url
-                item_page_response = net.http_request(item_page_url)
-                if item_page_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-                    item_detail = tool.find_sub_string(item_page_response.data, '<div class="content-right-bdl clearfix">', '<dl class="content-right-bdr">')
+                item_url = base_host + item_url
+                item_response = net.http_request(item_url)
+                if item_response.status == net.HTTP_RETURN_CODE_SUCCEED:
+                    item_detail = tool.find_sub_string(item_response.data, '<div class="content-right-bdl clearfix">', '<dl class="content-right-bdr">')
                     item_detail = item_detail.decode("GBK").encode("utf-8")
                     attribute = tool.find_sub_string(item_detail, "<!-- 主要属性-->", "<!-- 华丽丽的分割线 -->").strip()
                     special_attribute = tool.find_sub_string(attribute, '<li class="d3-color-orange">', "</li>")
@@ -85,10 +85,10 @@ for item_path, item_position in item_list.items():
                     print item_position, item_name, special_attribute, item_introduction
                     item_attribute_list[item_path].append([item_name, special_attribute, item_introduction])
                 else:
-                    print "error get" + item_page_url
+                    print "error get" + item_url
         else:
             print "error get" + item_index_url
-        pagination = tool.find_sub_string(item_index_page_response.data, '<ul class="ui-pagination">', "</ul>")
+        pagination = tool.find_sub_string(item_index_response.data, '<ul class="ui-pagination">', "</ul>")
         if pagination:
             pagination = re.findall('<a href="#page=([\d]*)">', pagination)
             max_page = 1
