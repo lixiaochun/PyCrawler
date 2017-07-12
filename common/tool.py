@@ -185,18 +185,18 @@ def print_msg(msg, is_time=True):
     thread_lock.acquire()
     # 终端输出编码
     output_encoding = sys.stdout.encoding
-    if output_encoding == "utf-8":
+    if output_encoding == "UTF-8":
         print msg
     else:
-        print msg.decode("utf-8").encode(output_encoding)
+        print msg.decode("UTF-8").encode(output_encoding)
     thread_lock.release()
 
 
 # 控制台输入
 def console_input(msg):
     output_encoding = sys.stdout.encoding
-    if output_encoding != "utf-8":
-        msg = msg.decode("utf-8").encode(output_encoding)
+    if output_encoding != "UTF-8":
+        msg = msg.decode("UTF-8").encode(output_encoding)
     return raw_input(msg)
 
 
@@ -276,11 +276,13 @@ def change_path_encoding(path):
 # type=2: 覆盖
 def write_file(msg, file_path, append_type=1):
     thread_lock.acquire()
-    make_dir(os.path.dirname(file_path), 0)
+    make_dir(os.path.dirname(os.path.realpath(file_path)), 0)
     if append_type == 1:
         file_handle = open(file_path, "a")
     else:
         file_handle = open(file_path, "w")
+    if isinstance(msg, unicode):
+        msg = msg.encode("UTF-8")
     file_handle.write(msg + "\n")
     file_handle.close()
     thread_lock.release()
