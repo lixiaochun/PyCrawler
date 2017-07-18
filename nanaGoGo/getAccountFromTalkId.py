@@ -1,7 +1,7 @@
 # -*- coding:UTF-8  -*-
 """
 7gogo批量获取参与talk的账号
-https://www.instagram.com/
+https://7gogo.jp/
 @author: hikaru
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
@@ -11,7 +11,6 @@ import json
 import os
 import sys
 
-COOKIE_INFO = {}
 # 存放解析出的账号文件路径
 ACCOUNT_ID_FILE_PATH = os.path.join("info/account.data")
 
