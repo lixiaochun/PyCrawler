@@ -59,7 +59,7 @@ class Robot(object):
             os.chdir(application_path)
             config_path = os.path.join(os.getcwd(), "data/config.ini")
         else:
-            config_path = os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), "config.ini")
+            config_path = tool.PROJECT_CONFIG_PATH
 
         config = read_config(config_path)
 
@@ -156,11 +156,9 @@ class Robot(object):
             else:
                 self.image_temp_path = get_config(config, "IMAGE_TEMP_PATH", "tempImage", 3)
             # 图片下载数量，0为下载全部可用资源
-            self.get_image_count = get_config(config, "GET_IMAGE_COUNT", 0, 1)
         else:
             self.image_download_path = ""
             self.image_temp_path = ""
-            self.get_image_count = 0
         # 是否需要下载视频
         if self.is_download_video:
             # 视频保存目录
@@ -178,15 +176,11 @@ class Robot(object):
                 self.video_temp_path = extra_config["video_temp_path"]
             else:
                 self.video_temp_path = get_config(config, "VIDEO_TEMP_PATH", "tempVideo", 3)
-            # 视频下载数量，0为下载全部可用资源
-            self.get_video_count = get_config(config, "GET_VIDEO_COUNT", 0, 1)
         else:
             self.video_download_path = ""
             self.video_temp_path = ""
-            self.get_video_count = 0
         # 是否需要重新排序图片
         self.is_sort = get_config(config, "IS_SORT", True, 2)
-        self.get_page_count = get_config(config, "GET_PAGE_COUNT", 0, 1)
 
         # 代理
         is_proxy = get_config(config, "IS_PROXY", 2, 1)
@@ -311,7 +305,7 @@ def get_config(config, key, default_value, mode):
         if value[:2] == "\\\\":  # \\ 开头，程序所在目录
             value = os.path.join(os.path.abspath(""), value[2:])  # \\ 仅做标记使用，实际需要去除
         elif value[0] == "\\":   # \ 开头，项目根目录（common目录上级）
-            value = os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), "..", value[1:])  # \ 仅做标记使用，实际需要去除
+            value = os.path.join(tool.PROJECT_ROOT_PATH, value[1:])  # \ 仅做标记使用，实际需要去除
         value = os.path.realpath(value)
     return value
 
