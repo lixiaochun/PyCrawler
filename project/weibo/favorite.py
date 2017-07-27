@@ -6,11 +6,13 @@ http://www.weibo.com/
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
-from common import *
-import weiboCommon
-from pyquery import PyQuery as pq
 import os
 import re
+
+from pyquery import PyQuery as pq
+
+from common import *
+import weiboCommon
 
 COOKIE_INFO = {"SUB": ""}
 
@@ -70,7 +72,7 @@ def get_one_page_favorite(page_count):
                             for image_url in thumb_image_url_list:
                                 temp_list = image_url.split("/")
                                 temp_list[3] = "large"
-                                image_url_list.append(str("/".join(temp_list)))
+                                image_url_list.append("http:" + str("/".join(temp_list)))
                             extra_blog_info["image_url_list"] = image_url_list
                 else:
                     extra_info["is_error"] = True
