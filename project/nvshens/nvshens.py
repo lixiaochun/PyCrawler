@@ -25,7 +25,7 @@ def get_one_page_album(album_id, page_count):
         # 判断图集是否已经被删除
         extra_info["is_delete"] = album_pagination_response.data.find("<title>该页面未找到-宅男女神</title>") >= 0
         if not extra_info["is_delete"]:
-            album_pagination_response.data.find('<span style="color: #DB0909">0张照片</span>') >= 0
+            extra_info["is_delete"] = album_pagination_response.data.find("<span style='color: #DB0909'>0张照片</span>") >= 0
         if not extra_info["is_delete"]:
             # 获取图集标题
             extra_info["album_title"] = str(tool.find_sub_string(album_pagination_response.data, '<h1 id="htilte">', "</h1>")).strip()
@@ -34,7 +34,10 @@ def get_one_page_album(album_id, page_count):
             extra_info["image_url_list"] = map(str, image_url_list)
             # 判断是不是最后一页
             page_count_find = re.findall('/g/' + str(album_id) + '/([\d]*).html', tool.find_sub_string(album_pagination_response.data, '<div id="pages">', "</div>"))
-            max_page_count = max(map(int, page_count_find))
+            if len(page_count_find) > 0:
+                max_page_count = max(map(int, page_count_find))
+            else:
+                max_page_count = 1
             extra_info['is_over'] = page_count >= max_page_count
     album_pagination_response.extra_info = extra_info
     return album_pagination_response
