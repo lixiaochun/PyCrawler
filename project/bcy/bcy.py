@@ -132,14 +132,14 @@ def get_one_page_album(account_id, page_count):
                 extra_album_info = {
                     "album_id": None,  # 页面解析出的作品id
                     "album_title": None,  # 页面解析出的作品标题
-                    "html": album_selector.html(),  # 原始页面
+                    "html": str(album_selector.html().encode("UTF-8")),  # 原始页面
                 }
                 album_url = album_selector.find(".postWorkCard__img a.postWorkCard__link").attr("href")
                 album_title = album_selector.find(".postWorkCard__img footer").text()
                 album_id = None
                 if album_url:
                     album_id = str(album_url).split("/")[-1]
-                if robot.is_integer(album_id) and album_title:
+                if robot.is_integer(album_id):
                     extra_album_info["album_id"] = int(album_id)
                     extra_album_info["album_title"] = str(album_title.encode("UTF-8"))
                 extra_info["album_info_list"].append(extra_album_info)
@@ -363,7 +363,7 @@ class Download(threading.Thread):
                     if filtered_title:
                         album_path = os.path.join(image_path, "%s %s" % (album_info["album_id"], filtered_title))
                     else:
-                        album_path = os.path.join(image_path, album_info["album_id"])
+                        album_path = os.path.join(image_path, str(album_info["album_id"]))
                     if not tool.make_dir(album_path, 0):
                         # 目录出错，把title去掉后再试一次，如果还不行退出
                         log.error(account_name + " 创建作品目录 %s 失败，尝试不使用title" % album_path)
