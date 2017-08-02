@@ -10,7 +10,7 @@ from common import tool
 import os
 
 # Twitter存档文件目录
-SAVE_DATA_PATH = os.path.join("../twitter/info/save_5.data")
+SAVE_DATA_PATH = os.path.join(tool.PROJECT_APP_PATH, "twitter/info/save_5.data")
 # 图片下载后的保存目录
 FILE_STORAGE_PATH = os.path.join("photo")
 
@@ -20,10 +20,7 @@ def get_account_from_save_data():
     account_list = {}
     if not os.path.exists(SAVE_DATA_PATH):
         return account_list
-    file_handle = open(SAVE_DATA_PATH, "r")
-    lines = file_handle.readlines()
-    file_handle.close()
-    for line in lines:
+    for line in tool.read_file(SAVE_DATA_PATH, 2):
         line = line.replace("\n", "")
         account_info_temp = line.split("\t")
         account_list[account_info_temp[0]] = line

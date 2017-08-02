@@ -31,6 +31,8 @@ else:
     IS_EXECUTABLE = False
 # 项目根目录
 PROJECT_ROOT_PATH = os.path.abspath(os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), ".."))
+# 项目程序目录
+PROJECT_APP_PATH = os.path.join(PROJECT_ROOT_PATH, "project")
 # common目录
 PROJECT_COMMON_PATH = os.path.join(PROJECT_ROOT_PATH, "common")
 # config.ini路径
@@ -261,20 +263,39 @@ def change_path_encoding(path):
     return unicode(path, sys.stdin.encoding)
 
 
+# 读取文件
+# type=1: 读取整个文件，同 .read()，返回string
+# type=2: 按行读取整个文件，同 .readlines()，返回list
+def read_file(file_path, read_type=1):
+    file_path = change_path_encoding(file_path)
+    if not os.path.exists(file_path):
+        if read_type == 1:
+            return ""
+        else:
+            return []
+    with open(file_path, "r") as file_handle:
+        if read_type == 1:
+            result = file_handle.read()
+        else:
+            result = file_handle.readlines()
+    return result
+
+
 # 写文件
 # type=1: 追加
 # type=2: 覆盖
 def write_file(msg, file_path, append_type=1):
+    file_path = change_path_encoding(file_path)
     thread_lock.acquire()
-    make_dir(os.path.dirname(os.path.realpath(file_path)), 0)
-    if append_type == 1:
-        file_handle = open(file_path, "a")
-    else:
-        file_handle = open(file_path, "w")
-    if isinstance(msg, unicode):
-        msg = msg.encode("UTF-8")
-    file_handle.write(msg + "\n")
-    file_handle.close()
+    if make_dir(os.path.dirname(file_path), 0):
+        if append_type == 1:
+            open_type = "a"
+        else:
+            open_type = "w"
+        with open(file_path, open_type) as file_handle:
+            if isinstance(msg, unicode):
+                msg = msg.encode("UTF-8")
+            file_handle.write(msg + "\n")
     thread_lock.release()
 
 
@@ -426,10 +447,9 @@ def get_file_md5(file_path):
     file_path = change_path_encoding(file_path)
     if not os.path.exists(file_path):
         return None
-    file_handle = open(file_path, "rb")
     md5_obj = hashlib.md5()
-    md5_obj.update(file_handle.read())
-    file_handle.close()
+    with open(file_path, "rb") as file_handle:
+        md5_obj.update(file_handle.read())
     return md5_obj.hexdigest()
 
 

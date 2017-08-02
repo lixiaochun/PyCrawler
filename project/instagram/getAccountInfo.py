@@ -33,7 +33,7 @@ def get_account_index_page(account_name):
 def main():
     config = config = robot.read_config(tool.PROJECT_CONFIG_PATH)
     # 存档位置
-    save_data_path = robot.get_config(config, "SAVE_DATA_PATH", "info/save.data", 3)
+    save_data_path = robot.get_config(config, "SAVE_DATA_PATH", "\\\\info/save.data", 3)
     # 读取存档文件
     account_list = robot.read_save_data(save_data_path, 0, [""])
     # 设置代理
@@ -44,7 +44,7 @@ def main():
         # 使用代理的线程池
         net.set_proxy(proxy_ip, proxy_port)
 
-    result_file_path = "info/account_info.data"
+    result_file_path = os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), "info/account_info.data")
     for account in sorted(account_list.keys()):
         account_index_response = get_account_index_page(account)
         if account_index_response.status == net.HTTP_RETURN_CODE_SUCCEED:

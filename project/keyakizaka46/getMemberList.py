@@ -9,18 +9,12 @@ email: hikaru870806@hotmail.com
 from common import net, robot, tool
 import os
 import re
-import sys
 
 
 # 获取存档文件
 def get_account_from_save_data(file_path):
     account_list = {}
-    if not os.path.exists(file_path):
-        return account_list
-    file_handle = open(file_path, "r")
-    lines = file_handle.readlines()
-    file_handle.close()
-    for line in lines:
+    for line in tool.read_file(file_path, 2):
         line = line.replace("\n", "")
         account_info_temp = line.split("\t")
         account_list[account_info_temp[0]] = line
@@ -46,7 +40,7 @@ def get_account_from_index():
 def main():
     config = robot.read_config(tool.PROJECT_CONFIG_PATH)
     # 存档位置
-    save_data_path = robot.get_config(config, "SAVE_DATA_PATH", "info/save.data", 3)
+    save_data_path = robot.get_config(config, "SAVE_DATA_PATH", "\\\\info/save.data", 3)
     account_list_from_api = get_account_from_index()
     if len(account_list_from_api) > 0:
         account_list_from_save_data = get_account_from_save_data(save_data_path)

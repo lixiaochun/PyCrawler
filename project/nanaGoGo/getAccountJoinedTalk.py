@@ -9,22 +9,18 @@ email: hikaru870806@hotmail.com
 from common import *
 from pyquery import PyQuery as PQ
 import os
+import sys
 
 # 存放账号的文件路径
-ACCOUNT_ID_FILE_PATH = os.path.join("info/account.data")
+ACCOUNT_ID_FILE_PATH = os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), "info/account.data")
 # 存放解析出的账号文件路径
-TALK_ID_FILE_PATH = os.path.join("info/talk.data")
+TALK_ID_FILE_PATH = os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), "info/talk.data")
 
 
 # 获取account id文件
 def get_account_from_file():
     account_list = {}
-    if not os.path.exists(ACCOUNT_ID_FILE_PATH):
-        return account_list
-    file_handle = open(ACCOUNT_ID_FILE_PATH, "r")
-    lines = file_handle.readlines()
-    file_handle.close()
-    for line in lines:
+    for line in tool.read_file(ACCOUNT_ID_FILE_PATH, 2):
         split_temp = line.replace("\n", "").split("\t")
         account_list[split_temp[0]] = split_temp[1]
     return account_list
@@ -68,10 +64,9 @@ def main():
     for account_id in account_list:
         get_account_talks(account_id, account_list[account_id], talk_list)
     if len(talk_list) > 0:
-        file_handle = open(TALK_ID_FILE_PATH, "w")
-        for talk_id in talk_list:
-            file_handle.write("%s\t%s\t%s\t%s\n" % (talk_id, talk_list[talk_id]["talk_name"], talk_list[talk_id]["talk_description"], " & ".join(talk_list[talk_id]["account_list"])))
-        file_handle.close()
+        with open(TALK_ID_FILE_PATH, "w") as file_handle:
+            for talk_id in talk_list:
+                file_handle.write("%s\t%s\t%s\t%s\n" % (talk_id, talk_list[talk_id]["talk_name"], talk_list[talk_id]["talk_description"], " & ".join(talk_list[talk_id]["account_list"])))
 
 
 if __name__ == "__main__":

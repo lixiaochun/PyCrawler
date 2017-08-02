@@ -6,47 +6,13 @@ email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
 from common import *
-import base64
-import json
-import os
-import sys
-
-
-AUTH_TOKEN = ""
-ZHEZHE_INFO = ""
-
-
-# 从文件中获取用户信息
-def get_token_from_file():
-    account_file_path = os.path.realpath("account.data")
-    if not os.path.exists(account_file_path):
-        return False
-    file_handle = open(account_file_path, "r")
-    file_string = file_handle.read()
-    file_handle.close()
-    file_string.replace("\n", "")
-    try:
-        account_data = json.loads(base64.b64decode(file_string))
-    except TypeError:
-        return False
-    except ValueError:
-        return False
-    if robot.check_sub_key(("access_token", "auth_token", "zhezhe_info"), account_data):
-        global AUTH_TOKEN
-        global ZHEZHE_INFO
-        AUTH_TOKEN = account_data["auth_token"]
-        ZHEZHE_INFO = account_data["zhezhe_info"]
-        return True
-    return False
+import yasaxiCommon
 
 
 # 获取存档文件
 def get_account_from_save_data(file_path):
-    file_handle = open(file_path, "r")
-    lines = file_handle.readlines()
-    file_handle.close()
     account_list = {}
-    for line in lines:
+    for line in tool.read_file(file_path, 2):
         line = line.replace("\n", "")
         account_info_temp = line.split("\t")
         account_list[account_info_temp[0]] = line
@@ -57,8 +23,8 @@ def get_account_from_save_data(file_path):
 def get_account_from_api():
     api_url = "https://api.yasaxi.com/users/recommend?tag="
     header_list = {
-        "x-auth-token": AUTH_TOKEN,
-        "x-zhezhe-info": ZHEZHE_INFO,
+        "x-auth-token": yasaxiCommon.AUTH_TOKEN,
+        "x-zhezhe-info": yasaxiCommon.ZHEZHE_INFO,
     }
     account_list = {}
     api_response = net.http_request(api_url, header_list=header_list, json_decode=True)
@@ -70,10 +36,10 @@ def get_account_from_api():
 
 
 def main():
-    if get_token_from_file():
+    if yasaxiCommon.get_token_from_file():
         config = robot.read_config(tool.PROJECT_CONFIG_PATH)
         # 存档位置
-        save_data_path = robot.get_config(config, "SAVE_DATA_PATH", "info/save.data", 3)
+        save_data_path = robot.get_config(config, "SAVE_DATA_PATH", "\\\\info/save.data", 3)
         account_list_from_api = get_account_from_api()
         if len(account_list_from_api) > 0:
             account_list_from_save_data = get_account_from_save_data(save_data_path)
