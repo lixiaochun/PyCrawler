@@ -288,13 +288,13 @@ def read_file(file_path, read_type=1):
 # type=1: 追加
 # type=2: 覆盖
 def write_file(msg, file_path, append_type=1):
-    file_path = change_path_encoding(file_path)
     thread_lock.acquire()
     if make_dir(os.path.dirname(file_path), 0):
         if append_type == 1:
             open_type = "a"
         else:
             open_type = "w"
+        file_path = change_path_encoding(file_path)
         with open(file_path, open_type) as file_handle:
             if isinstance(msg, unicode):
                 msg = msg.encode("UTF-8")
@@ -401,8 +401,7 @@ def make_dir(dir_path, create_mode):
                     time.sleep(5)
             else:
                 return True
-    count = 0
-    while count <= 5:
+    for retry_count in range(0, 5):
         try:
             os.makedirs(dir_path)
             if os.path.isdir(dir_path):
@@ -410,15 +409,18 @@ def make_dir(dir_path, create_mode):
         except Exception, e:
             print_msg(str(e))
             time.sleep(5)
-        count += 1
     return False
 
 
 # 复制文件
-def copy_files(source_path, destination_path):
-    source_path = change_path_encoding(source_path)
-    destination_path = change_path_encoding(destination_path)
-    shutil.copyfile(source_path, destination_path)
+# source_file_path      源文件路径
+# destination_file_path 目标文件路径
+def copy_files(source_file_path, destination_file_path):
+    source_file_path = change_path_encoding(source_file_path)
+    if not make_dir(os.path.dirname(destination_file_path), 0):
+        return
+    destination_file_path = change_path_encoding(destination_file_path)
+    shutil.copyfile(source_file_path, destination_file_path)
 
 
 # 生成指定长度的随机字符串

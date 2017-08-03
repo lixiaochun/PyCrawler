@@ -76,10 +76,10 @@ class Rosi(robot.Robot):
         else:
             last_album_id = 0
 
-        new_last_album_id = ""
         total_image_count = 0
         page_count = 1
         is_over = False
+        first_album_id = None
         while not is_over:
             log.step("开始解析第%s页图集" % page_count)
 
@@ -88,7 +88,7 @@ class Rosi(robot.Robot):
                 album_pagination_response = get_one_page_album(page_count)
             except SystemExit:
                 log.step("提前退出")
-                break
+                tool.process_exit()
 
             if album_pagination_response.status != net.HTTP_RETURN_CODE_SUCCEED:
                 log.error("第%s页图集访问失败，原因：%s" % (page_count, robot.get_http_request_failed_reason(album_pagination_response.status)))
@@ -97,23 +97,26 @@ class Rosi(robot.Robot):
             log.trace("第%s页获取的所有图集：%s" % (page_count, album_pagination_response.extra_info["album_info_list"]))
 
             for album_info in album_pagination_response.extra_info["album_info_list"]:
+                # 检查是否达到存档记录
                 if int(album_info["album_id"]) <= last_album_id:
                     is_over = True
                     break
 
-                if new_last_album_id == "":
-                    new_last_album_id = album_info["album_id"]
+                # 新的存档记录
+                if first_album_id is None:
+                    first_album_id = album_info["album_id"]
 
                 album_page_count = 1
                 image_count = 1
                 album_path = os.path.join(self.image_download_path, album_info["album_id"])
-                if not tool.make_dir(album_path, 0):
-                    # 图片保存目录创建失败
-                    self.print_msg("图片下载目录%s创建失败！" % album_path)
-                    tool.process_exit()
-
                 while True:
-                    photo_pagination_response = get_one_page_photo(album_info["page_id"], album_page_count)
+                    try:
+                        photo_pagination_response = get_one_page_photo(album_info["page_id"], album_page_count)
+                    except SystemExit:
+                        log.step("提前退出")
+                        tool.remove_dir_or_file(album_path)
+                        tool.process_exit()
+
                     if photo_pagination_response.status != net.HTTP_RETURN_CODE_SUCCEED:
                         log.error("%s号图集第%s页访问失败，原因：%s" % (album_info["album_id"], album_page_count, robot.get_http_request_failed_reason(photo_pagination_response.status)))
                         break
@@ -129,7 +132,6 @@ class Rosi(robot.Robot):
 
                         file_type = image_url.split(".")[-1]
                         file_path = os.path.join(album_path, "%03d.%s" % (image_count, file_type))
-
                         try:
                             save_file_return = net.save_net_file(image_url, file_path)
                             if save_file_return["status"] == 1:
@@ -140,8 +142,7 @@ class Rosi(robot.Robot):
                         except SystemExit:
                             log.step("提前退出")
                             tool.remove_dir_or_file(album_path)
-                            is_over = True
-                            break
+                            tool.process_exit()
 
                     if is_over or photo_pagination_response.extra_info["is_over"]:
                         break
@@ -160,8 +161,8 @@ class Rosi(robot.Robot):
                     page_count += 1
 
         # 重新保存存档文件
-        if new_last_album_id != "":
-            tool.write_file(str(new_last_album_id), self.save_data_path, 2)
+        if first_album_id is not None:
+            tool.write_file(str(first_album_id), self.save_data_path, 2)
 
         log.step("全部下载完毕，耗时%s秒，共计图片%s张" % (self.get_run_time(), total_image_count))
 

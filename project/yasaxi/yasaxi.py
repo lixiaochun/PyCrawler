@@ -185,13 +185,11 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-
             image_count = 1
             cursor = 0
-            first_status_id = ""
             is_over = False
-            need_make_image_dir = True
+            first_status_id = None
+            image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析cursor '%s'的图片" % cursor)
 
@@ -212,24 +210,18 @@ class Download(threading.Thread):
                         log.error(account_name + " 状态%s解析失败" % status_info["json_data"])
                         tool.process_exit()
 
-                    # 检查是否已下载到前一次的日志
+                    # 检查是否达到存档记录
                     if status_info["id"] == self.account_info[1]:
                         is_over = True
                         break
 
-                    if first_status_id == "":
+                    # 新的存档记录
+                    if first_status_id is None:
                         first_status_id = status_info["id"]
 
                     log.step(account_name + " 开始解析状态%s的图片" % status_info["id"])
 
                     for image_url in status_info["image_url_list"]:
-                        # 第一张图片，创建目录
-                        if need_make_image_dir:
-                            if not (tool.make_dir(image_path, 0) and tool.make_dir(os.path.join(image_path, "origin"), 0) and tool.make_dir(os.path.join(image_path, "other"), 0)):
-                                log.error(account_name + " 创建图片下载目录 %s 失败" % image_path)
-                                tool.process_exit()
-                            need_make_image_dir = False
-
                         file_name_and_type = image_url.split("?")[0].split("/")[-1]
                         resolution = image_url.split("?")[0].split("/")[-2]
                         file_name = file_name_and_type.split(".")[0]
@@ -255,7 +247,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s张图片" % (image_count - 1))
 
             # 新的存档记录
-            if first_status_id != "":
+            if first_status_id is not None:
                 self.account_info[1] = first_status_id
 
             # 保存最后的信息

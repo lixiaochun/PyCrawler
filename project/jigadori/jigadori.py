@@ -38,7 +38,7 @@ def get_one_page_photo(page_count):
                 tweet_id = tool.find_sub_string(tweet_url.strip(), "status/")
             else:
                 tweet_id = None
-            if account_name and tweet_time and tweet_id and robot.is_integer(tweet_id):
+            if account_name and tweet_time and robot.is_integer(tweet_id):
                 extra_photo_info["account_name"] = account_name.strip().replace("@", "")
                 extra_photo_info["time"] = int(time.mktime(time.strptime(tweet_time.strip(), "%Y-%m-%d %H:%M:%S")))
                 extra_photo_info["tweet_id"] = int(tweet_id)
@@ -84,22 +84,11 @@ class Jigadori(robot.Robot):
                 image_start_index = int(save_info[0])
                 last_blog_time = int(save_info[1])
 
-        if self.is_sort:
-            image_path = self.image_temp_path
-        else:
-            image_path = self.image_download_path
-
-        if not tool.make_dir(image_path, 0):
-            # 图片保存目录创建失败
-            self.print_msg("图片下载目录%s创建失败！" % self.image_download_path)
-            tool.process_exit()
-
-        # 下载
         page_count = 1
         image_count = 1
-        new_last_blog_time = ""
         unique_list = []
         is_over = False
+        first_blog_time = None
         while not is_over:
             log.step("开始解析第%s页图片" % page_count)
 
@@ -118,14 +107,14 @@ class Jigadori(robot.Robot):
                     log.error("第%s张图片所在页面%s解析失败" % (page_count, image_info["html"]))
                     tool.process_exit()
 
-                # 检查是否已下载到前一次的图片
+                # 检查是否达到存档记录
                 if image_info["time"] <= last_blog_time:
                     is_over = True
                     break
 
-                # 将第一张图片的上传时间做为新的存档记录
-                if new_last_blog_time == "":
-                    new_last_blog_time = str(image_info["time"])
+                # 新的存档记录
+                if first_blog_time is None:
+                    first_blog_time = str(image_info["time"])
 
                 # 新增图片导致的重复判断
                 if image_info["tweet_id"] in unique_list:
@@ -139,7 +128,7 @@ class Jigadori(robot.Robot):
                     file_type = image_url.split(".")[-1]
                     if file_type.find("/") != -1:
                         file_type = "jpg"
-                    file_path = os.path.join(image_path, "%05d_%s.%s" % (image_count, image_info["account_name"], file_type))
+                    file_path = os.path.join(self.image_temp_path, "%05d_%s.%s" % (image_count, image_info["account_name"], file_type))
                     save_file_return = net.save_net_file(image_url, file_path)
                     if save_file_return["status"] == 1:
                         log.step("第%s张图片下载成功" % image_count)
@@ -153,11 +142,7 @@ class Jigadori(robot.Robot):
         log.step("下载完毕")
 
         # 排序复制到保存目录
-        if self.is_sort:
-            if not tool.make_dir(self.image_download_path, 0):
-                log.error("创建目录 %s 失败" % self.image_download_path)
-                tool.process_exit()
-
+        if image_count > 1:
             log.step("图片开始从下载目录移动到保存目录")
 
             file_list = tool.get_dir_files_name(self.image_temp_path, "desc")
@@ -178,8 +163,8 @@ class Jigadori(robot.Robot):
             tool.remove_dir_or_file(self.image_temp_path)
 
         # 保存新的存档文件
-        if new_last_blog_time != "":
-            tool.write_file(str(image_start_index) + "\t" + new_last_blog_time, self.save_data_path, 2)
+        if first_blog_time is not None:
+            tool.write_file(str(image_start_index) + "\t" + first_blog_time, self.save_data_path, 2)
 
         log.step("全部下载完毕，耗时%s秒，共计图片%s张" % (self.get_run_time(), image_count - 1))
 

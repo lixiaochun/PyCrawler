@@ -24,7 +24,6 @@ IMAGE_DOWNLOAD_PATH = ""
 VIDEO_TEMP_PATH = ""
 VIDEO_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 IS_DOWNLOAD_IMAGE = True
 IS_DOWNLOAD_VIDEO = True
 
@@ -38,7 +37,7 @@ def get_account_index_page(account_name):
     }
     if account_index_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         account_id = tool.find_sub_string(account_index_response.data, '<div class="ProfileNav" role="navigation" data-user-id="', '">')
-        if account_id and robot.is_integer(account_id):
+        if robot.is_integer(account_id):
             extra_info["account_id"] = account_id
     account_index_response.extra_info = extra_info
     return account_index_response
@@ -86,7 +85,7 @@ def get_one_page_media(account_name, position_blog_id):
                         }
                         # 获取日志id
                         blog_id = tool.find_sub_string(tweet_data, 'data-tweet-id="', '"')
-                        if blog_id and robot.is_integer(blog_id):
+                        if robot.is_integer(blog_id):
                             extra_media_info["blog_id"] = str(blog_id)
                         else:
                             extra_info["is_error"] = True
@@ -168,7 +167,6 @@ class Twitter(robot.Robot):
         global VIDEO_TEMP_PATH
         global VIDEO_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
         global IS_DOWNLOAD_IMAGE
         global IS_DOWNLOAD_VIDEO
 
@@ -184,7 +182,6 @@ class Twitter(robot.Robot):
         IMAGE_DOWNLOAD_PATH = self.image_download_path
         VIDEO_TEMP_PATH = self.video_temp_path
         VIDEO_DOWNLOAD_PATH = self.video_download_path
-        IS_SORT = self.is_sort
         IS_DOWNLOAD_IMAGE = self.is_download_image
         IS_DOWNLOAD_VIDEO = self.is_download_video
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
@@ -253,14 +250,6 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
-                video_path = os.path.join(VIDEO_TEMP_PATH, account_name)
-            else:
-                image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-                video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-
             account_index_response = get_account_index_page(account_name)
             if account_index_response.status != net.HTTP_RETURN_CODE_SUCCEED:
                 log.error(account_name + " 首页访问访问失败，原因：%s" % robot.get_http_request_failed_reason(account_index_response.status))
@@ -279,10 +268,10 @@ class Download(threading.Thread):
             image_count = 1
             video_count = 1
             position_blog_id = INIT_MAX_ID
-            first_tweet_id = "0"
             is_over = False
-            need_make_image_dir = True
-            need_make_video_dir = True
+            first_tweet_id = None
+            image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
+            video_path = os.path.join(VIDEO_TEMP_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析position %s后的一页媒体列表" % position_blog_id)
 
@@ -308,13 +297,13 @@ class Download(threading.Thread):
 
                     log.step(account_name + " 开始解析日志 %s" % media_info["blog_id"])
 
-                    # 检查是否tweet的id小于上次的记录
+                    # 检查是否达到存档记录
                     if int(media_info["blog_id"]) <= int(self.account_info[4]):
                         is_over = True
                         break
 
-                    # 将第一个tweet的id做为新的存档记录
-                    if first_tweet_id == "0":
+                    # 新的存档记录
+                    if first_tweet_id is None:
                         first_tweet_id = media_info["blog_id"]
 
                     # 视频
@@ -331,13 +320,6 @@ class Download(threading.Thread):
 
                         video_url = video_play_response.extra_info["video_url"]
                         log.step(account_name + " 开始下载第%s个视频 %s" % (video_count, video_url))
-
-                        # 第一个视频，创建目录
-                        if need_make_video_dir:
-                            if not tool.make_dir(video_path, 0):
-                                log.error(account_name + " 创建图片下载目录 %s 失败" % video_path)
-                                tool.process_exit()
-                            need_make_video_dir = False
 
                         # 分割后的ts格式视频
                         if isinstance(video_url, list):
@@ -359,13 +341,6 @@ class Download(threading.Thread):
                     if IS_DOWNLOAD_IMAGE:
                         for image_url in media_info["image_url_list"]:
                             log.step(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
-
-                            # 第一张图片，创建目录
-                            if need_make_image_dir:
-                                if not tool.make_dir(image_path, 0):
-                                    log.error(account_name + " 创建图片下载目录 %s 失败" % image_path)
-                                    tool.process_exit()
-                                need_make_image_dir = False
 
                             file_type = image_url.split(".")[-1].split(":")[0]
                             image_file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
@@ -393,26 +368,25 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s张图片和%s个视频" % (image_count - 1, video_count - 1))
 
             # 排序
-            if IS_SORT:
-                if image_count > 1:
-                    log.step(account_name + " 图片开始从下载目录移动到保存目录")
-                    destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-                    if robot.sort_file(image_path, destination_path, int(self.account_info[2]), 4):
-                        log.step(account_name + " 图片从下载目录移动到保存目录成功")
-                    else:
-                        log.error(account_name + " 创建图片子目录 %s 失败" % destination_path)
-                        tool.process_exit()
-                if video_count > 1:
-                    log.step(account_name + " 视频开始从下载目录移动到保存目录")
-                    destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-                    if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
-                        log.step(account_name + " 视频从下载目录移动到保存目录成功")
-                    else:
-                        log.error(account_name + " 创建视频保存目录 %s 失败" % destination_path)
-                        tool.process_exit()
+            if image_count > 1:
+                log.step(account_name + " 图片开始从下载目录移动到保存目录")
+                destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
+                if robot.sort_file(image_path, destination_path, int(self.account_info[2]), 4):
+                    log.step(account_name + " 图片从下载目录移动到保存目录成功")
+                else:
+                    log.error(account_name + " 创建图片子目录 %s 失败" % destination_path)
+                    tool.process_exit()
+            if video_count > 1:
+                log.step(account_name + " 视频开始从下载目录移动到保存目录")
+                destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
+                if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
+                    log.step(account_name + " 视频从下载目录移动到保存目录成功")
+                else:
+                    log.error(account_name + " 创建视频保存目录 %s 失败" % destination_path)
+                    tool.process_exit()
 
             # 新的存档记录
-            if first_tweet_id != "0":
+            if first_tweet_id is not None:
                 self.account_info[2] = str(int(self.account_info[2]) + image_count - 1)
                 self.account_info[3] = str(int(self.account_info[3]) + video_count - 1)
                 self.account_info[4] = first_tweet_id

@@ -179,8 +179,6 @@ class Robot(object):
         else:
             self.video_download_path = ""
             self.video_temp_path = ""
-        # 是否需要重新排序图片
-        self.is_sort = get_config(config, "IS_SORT", True, 2)
 
         # 代理
         is_proxy = get_config(config, "IS_PROXY", 2, 1)
@@ -255,15 +253,14 @@ class Robot(object):
 
     # 下载逻辑完成后手动调用，进行一些收尾工作
     def finish_task(self):
-        if self.is_sort:
-            if self.image_temp_path:
-                tool.delete_null_dir(self.image_temp_path)
-                if os.path.exists(self.image_temp_path):
-                    self.print_msg("图片临时下载目录%s中存在文件" % self.image_temp_path)
-            if self.video_temp_path:
-                tool.delete_null_dir(self.video_temp_path)
-                if os.path.exists(self.video_temp_path):
-                    self.print_msg("视频临时下载目录%s中存在文件" % self.video_temp_path)
+        if self.image_temp_path:
+            tool.delete_null_dir(self.image_temp_path)
+            if os.path.exists(self.image_temp_path):
+                self.print_msg("图片临时下载目录%s中存在文件" % self.image_temp_path)
+        if self.video_temp_path:
+            tool.delete_null_dir(self.video_temp_path)
+            if os.path.exists(self.video_temp_path):
+                self.print_msg("视频临时下载目录%s中存在文件" % self.video_temp_path)
 
 
 # 读取配置文件
@@ -310,7 +307,7 @@ def get_config(config, key, default_value, mode):
     return value
 
 
-# 将制定文件夹内的所有文件排序重命名并复制到其他文件夹中
+# 将指定文件夹内的所有文件排序重命名并复制到其他文件夹中
 def sort_file(source_path, destination_path, start_count, file_name_length):
     file_list = tool.get_dir_files_name(source_path, "desc")
     # 判断排序目标文件夹是否存在

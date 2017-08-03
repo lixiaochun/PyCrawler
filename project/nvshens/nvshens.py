@@ -25,11 +25,14 @@ def get_one_page_album(album_id, page_count):
     if album_pagination_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         # 判断图集是否已经被删除
         extra_info["is_delete"] = album_pagination_response.data.find("<title>该页面未找到-宅男女神</title>") >= 0
+        # 获取图集图片总数
         image_count = tool.find_sub_string(album_pagination_response.data, "<span style='color: #DB0909'>", "张照片</span>")
         if robot.is_integer(image_count):
             extra_info["image_count"] = int(image_count)
         else:
             extra_info["image_count"] = 0
+        if extra_info["image_count"] == 0:
+            extra_info["is_delete"] = True
         if not extra_info["is_delete"]:
             # 获取图集标题
             extra_info["album_title"] = str(tool.find_sub_string(album_pagination_response.data, '<h1 id="htilte">', "</h1>")).strip()
@@ -78,7 +81,6 @@ class Nvshens(robot.Robot):
             album_id = 10000
 
         newest_album_id = get_newest_album_id()
-
         if newest_album_id is None:
             log.error("最新图集id获取失败")
             tool.process_exit()
@@ -95,6 +97,10 @@ class Nvshens(robot.Robot):
             album_title = ""
             album_path = os.path.join(self.image_download_path, str(album_id))
             while not is_over:
+                if page_count >= 100:
+                    log.error("%s号图集已解析到100页，可能有异常，退出" % album_id)
+                    break
+
                 log.step("开始解析%s号图集第%s页" % (album_id, page_count))
 
                 # 获取相册
@@ -116,6 +122,10 @@ class Nvshens(robot.Robot):
                         log.error("%s号图集第%s页已删除" % (album_id, page_count))
                         break
 
+                if len(album_pagination_response.extra_info["image_url_list"]) == 0:
+                    log.error("%s号图集第%s页没有获取到图片" % (album_id, page_count))
+                    break
+
                 log.trace("%s号图集第%s页的所有图片：%s" % (album_id, page_count, album_pagination_response.extra_info["image_url_list"]))
 
                 # 过滤标题中不支持的字符
@@ -132,6 +142,7 @@ class Nvshens(robot.Robot):
                         if not tool.make_dir(album_path, 0):
                             log.error("创建图集目录 %s 失败" % album_path)
                             tool.process_exit()
+                            
                     this_album_total_image_count = album_pagination_response.extra_info["image_count"]
                 else:
                     if this_album_total_image_count != album_pagination_response.extra_info["image_count"]:

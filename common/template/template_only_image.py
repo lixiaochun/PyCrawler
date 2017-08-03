@@ -18,7 +18,6 @@ TOTAL_IMAGE_COUNT = 0
 IMAGE_TEMP_PATH = ""
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 
 
 class Template(robot.Robot):
@@ -26,7 +25,6 @@ class Template(robot.Robot):
         global IMAGE_TEMP_PATH
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
 
         # todo 配置
         sys_config = {
@@ -39,7 +37,6 @@ class Template(robot.Robot):
         # 设置全局变量，供子线程调用
         IMAGE_TEMP_PATH = self.image_temp_path
         IMAGE_DOWNLOAD_PATH = self.image_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
     def main(self):
@@ -107,32 +104,24 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
-            else:
-                image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-
             # todo 图片下载逻辑
-            # 图片
             image_count = 1
-            first_image_time = "0"
-            need_make_image_dir = True
+            first_image_time = None
+            image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
 
             log.step(account_name + " 下载完毕，总共获得%s张图片" % (image_count - 1))
 
             # 排序
-            if IS_SORT:
-                if first_image_time != "0":
-                    destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-                    if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
-                        log.step(account_name + " 图片从下载目录移动到保存目录成功")
-                    else:
-                        log.error(account_name + " 创建图片保存目录 %s 失败" % destination_path)
-                        tool.process_exit()
+            if image_count > 0:
+                destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
+                if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
+                    log.step(account_name + " 图片从下载目录移动到保存目录成功")
+                else:
+                    log.error(account_name + " 创建图片保存目录 %s 失败" % destination_path)
+                    tool.process_exit()
 
             # 新的存档记录
-            if first_image_time != "0":
+            if first_image_time is not None:
                 self.account_info[1] = str(int(self.account_info[1]) + image_count - 1)
                 self.account_info[2] = first_image_time
 

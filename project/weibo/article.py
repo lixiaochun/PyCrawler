@@ -6,21 +6,19 @@ http://www.weibo.com/
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
+from common import *
+import weiboCommon
 import os
 import re
 import threading
 import time
 import traceback
 
-from common import *
-import weiboCommon
-
 ACCOUNTS = []
 TOTAL_IMAGE_COUNT = 0
 IMAGE_TEMP_PATH = ""
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 COOKIE_INFO = {"SUB": ""}
 
 
@@ -122,7 +120,6 @@ class Article(robot.Robot):
         global IMAGE_TEMP_PATH
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
         global COOKIE_INFO
 
         sys_config = {
@@ -137,7 +134,6 @@ class Article(robot.Robot):
         # 设置全局变量，供子线程调用
         IMAGE_TEMP_PATH = self.image_temp_path
         IMAGE_DOWNLOAD_PATH = self.image_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
         COOKIE_INFO.update(self.cookie_value)
 
@@ -232,8 +228,8 @@ class Download(threading.Thread):
 
             page_count = 1
             this_account_total_image_count = 0
-            first_article_time = "0"
             is_over = False
+            first_article_time = None
             image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
             while not is_over:
                 # 获取一页文章预览页面
@@ -258,13 +254,13 @@ class Download(threading.Thread):
                         log.error(account_name + " 文章预览 %s 中的地址解析失败" % article_info["article_html"])
                         tool.process_exit()
 
-                    # 检查是否是上一次的最后视频
+                    # 检查是否达到存档记录
                     if article_info["article_time"] <= int(self.account_info[1]):
                         is_over = True
                         break
 
-                    # 将第一个视频的地址做为新的存档记录
-                    if first_article_time == "0":
+                    # 新的存档记录
+                    if first_article_time is None:
                         first_article_time = str(article_info["article_time"])
 
                     log.step(account_name + " 开始解析文章%s" % article_info["article_url"])
@@ -348,7 +344,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s张图片" % this_account_total_image_count)
 
             # 新的存档记录
-            if first_article_time != "0":
+            if first_article_time is not None:
                 self.account_info[1] = first_article_time
 
             # 保存最后的信息

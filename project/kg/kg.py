@@ -155,15 +155,12 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-
-            # 歌曲
             video_count = 1
             page_count = 1
-            first_audio_time = "0"
             unique_list = []
-            need_make_download_dir = True
             is_over = False
+            first_audio_time = None
+            video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析第%s页歌曲" % page_count)
 
@@ -188,13 +185,13 @@ class Download(threading.Thread):
                         log.error(account_name + " 歌曲信息%s的歌曲时间解析失败" % audio_info["json_data"])
                         tool.process_exit()
 
-                    # 检查是否已下载到前一次的歌曲
+                    # 检查是否达到存档记录
                     if int(audio_info["audio_time"]) <= int(self.account_info[1]):
                         is_over = True
                         break
 
-                    # 将第一首歌曲的id做为新的存档记录
-                    if first_audio_time == "0":
+                    # 新的存档记录
+                    if first_audio_time is None:
                         first_audio_time = audio_info["audio_time"]
 
                     # 新增歌曲导致的重复判断
@@ -216,13 +213,6 @@ class Download(threading.Thread):
                     audio_url = audio_play_response.extra_info["audio_url"]
                     log.step(account_name + " 开始下载第%s首歌曲《%s》 %s" % (video_count, audio_info["audio_title"], audio_url))
 
-                    # 第一首歌曲，创建目录
-                    if need_make_download_dir:
-                        if not tool.make_dir(video_path, 0):
-                            log.error(account_name + " 创建歌曲下载目录 %s 失败" % video_path)
-                            tool.process_exit()
-                        need_make_download_dir = False
-
                     file_type = audio_url.split(".")[-1].split("?")[0]
                     file_path = os.path.join(video_path, "%s - %s.%s" % (audio_info["audio_id"], audio_info["audio_title"], file_type))
                     save_file_return = net.save_net_file(audio_url, file_path)
@@ -240,7 +230,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s首歌曲" % (video_count - 1))
 
             # 新的存档记录
-            if first_audio_time != "0":
+            if first_audio_time is not None:
                 self.account_info[1] = first_audio_time
 
             # 保存最后的信息

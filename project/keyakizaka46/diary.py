@@ -19,7 +19,6 @@ TOTAL_IMAGE_COUNT = 0
 IMAGE_TEMP_PATH = ""
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 
 
 # 获取指定页数的所有日志
@@ -41,7 +40,7 @@ def get_one_page_blog(account_id, page_count):
             }
             # 获取日志id
             blog_id = tool.find_sub_string(blog_info, "/diary/detail/", "?")
-            if blog_id and robot.is_integer(blog_id):
+            if robot.is_integer(blog_id):
                 extra_blog_info["blog_id"] = blog_id
             # 获取日志页面中所有的图片地址列表
             image_url_list = re.findall('<img[\S|\s]*?src="([^"]+)"', blog_info)
@@ -57,7 +56,6 @@ class Diary(robot.Robot):
         global IMAGE_TEMP_PATH
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
 
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
@@ -67,7 +65,6 @@ class Diary(robot.Robot):
         # 设置全局变量，供子线程调用
         IMAGE_TEMP_PATH = self.image_temp_path
         IMAGE_DOWNLOAD_PATH = self.image_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
     def main(self):
@@ -137,17 +134,11 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
-            else:
-                image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-
             image_count = 1
             page_count = 1
-            first_blog_id = "0"
             is_over = False
-            need_make_image_dir = True
+            first_blog_id = None
+            image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析第%s页日志" % page_count)
 
@@ -162,18 +153,17 @@ class Download(threading.Thread):
                     break
 
                 for blog_data in blog_pagination_response.extra_info["blog_info_list"]:
-                    # 日志id
-                    if not blog_data["blog_id"]:
+                    if blog_data["blog_id"] is None:
                         log.error(account_name + " 日志信息%s解析日志id失败" % blog_data)
                         tool.process_exit()
 
-                    # 检查是否已下载到前一次的日志
+                    # 检查是否达到存档记录
                     if int(blog_data["blog_id"]) <= int(self.account_info[2]):
                         is_over = True
                         break
 
-                    # 将第一个日志的id做为新的存档记录
-                    if first_blog_id == "0":
+                    # 新的存档记录
+                    if first_blog_id is None:
                         first_blog_id = blog_data["blog_id"]
 
                     log.step(account_name + " 开始解析日志%s" % blog_data["blog_id"])
@@ -188,13 +178,6 @@ class Download(threading.Thread):
                                 image_url = "http://www.keyakizaka46.com/%s" % image_url
 
                         log.step(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
-
-                        # 第一张图片，创建目录
-                        if need_make_image_dir:
-                            if not tool.make_dir(image_path, 0):
-                                log.error(account_name + " 创建图片下载目录 %s 失败" % image_path)
-                                tool.process_exit()
-                            need_make_image_dir = False
 
                         file_type = image_url.split(".")[-1]
                         file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
@@ -211,7 +194,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s张图片" % (image_count - 1))
 
             # 排序
-            if IS_SORT and image_count > 1:
+            if image_count > 1:
                 log.step(account_name + " 图片开始从下载目录移动到保存目录")
                 destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
                 if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
@@ -221,7 +204,7 @@ class Download(threading.Thread):
                     tool.process_exit()
 
             # 新的存档记录
-            if first_blog_id != "0":
+            if first_blog_id is not None:
                 self.account_info[1] = str(int(self.account_info[1]) + image_count - 1)
                 self.account_info[2] = first_blog_id
 

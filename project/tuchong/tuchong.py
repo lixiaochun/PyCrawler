@@ -18,7 +18,6 @@ TOTAL_IMAGE_COUNT = 0
 IMAGE_TEMP_PATH = ""
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 IS_DOWNLOAD_IMAGE = True
 
 
@@ -88,7 +87,6 @@ class TuChong(robot.Robot):
         global IMAGE_TEMP_PATH
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
         global IS_DOWNLOAD_IMAGE
 
         sys_config = {
@@ -99,7 +97,6 @@ class TuChong(robot.Robot):
         # 设置全局变量，供子线程调用
         IMAGE_TEMP_PATH = self.image_temp_path
         IMAGE_DOWNLOAD_PATH = self.image_download_path
-        IS_SORT = self.is_sort
         IS_DOWNLOAD_IMAGE = self.is_download_image
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
@@ -177,13 +174,12 @@ class Download(threading.Thread):
                     tool.process_exit()
                 account_id = account_index_response.extra_info["account_id"]
 
-            image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-
             this_account_total_image_count = 0
             post_count = 0
-            first_post_id = "0"
             post_time = time.strftime('%Y-%m-%d %H:%M:%S')
             is_over = False
+            first_post_id = None
+            image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析%s后的一页相册" % post_time)
 
@@ -212,13 +208,13 @@ class Download(threading.Thread):
                         log.error(account_name + " 相册信息%s解析图片地址失败" % album_info["json_data"])
                         tool.process_exit()
 
-                    # 检查信息页id是否小于上次的记录
+                    # 检查是否达到存档记录
                     if int(album_info["album_id"]) <= int(self.account_info[1]):
                         is_over = True
                         break
 
-                    # 将第一个信息页的id做为新的存档记录
-                    if first_post_id == "0":
+                    # 新的存档记录
+                    if first_post_id is None:
                         first_post_id = album_info["album_id"]
 
                     log.step(account_name + " 开始解析相册%s" % album_info["album_id"])
@@ -258,7 +254,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s张图片" % this_account_total_image_count)
 
             # 新的存档记录
-            if first_post_id != "0":
+            if first_post_id is not None:
                 self.account_info[1] = first_post_id
 
             # 保存最后的信息

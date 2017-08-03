@@ -20,7 +20,6 @@ TOTAL_VIDEO_COUNT = 0
 VIDEO_TEMP_PATH = ""
 VIDEO_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 
 
 # 获取指定一页的视频信息
@@ -96,7 +95,6 @@ class WeiShi(robot.Robot):
         global VIDEO_TEMP_PATH
         global VIDEO_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
 
         sys_config = {
             robot.SYS_DOWNLOAD_VIDEO: True,
@@ -106,7 +104,6 @@ class WeiShi(robot.Robot):
         # 设置全局变量，供子线程调用
         VIDEO_TEMP_PATH = self.video_temp_path
         VIDEO_DOWNLOAD_PATH = self.video_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
     def main(self):
@@ -175,17 +172,11 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                video_path = os.path.join(VIDEO_TEMP_PATH, account_name)
-            else:
-                video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-
             video_count = 1
             page_time = 0
-            first_video_time = "0"
-            need_make_video_dir = True
             is_over = False
+            first_video_time = None
+            video_path = os.path.join(VIDEO_TEMP_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析第%s页视频" % video_count)
 
@@ -214,13 +205,13 @@ class Download(threading.Thread):
                         log.error(account_name + " 第%s个视频信息%s的视频时间解析失败" % (video_count, video_info["json_data"]))
                         tool.process_exit()
 
-                    # 检查是否已下载到前一次的视频
+                    # 检查是否达到存档记录
                     if video_info["video_time"] <= int(self.account_info[2]):
                         is_over = True
                         break
 
-                    # 将第一个视频的上传时间做为新的存档记录
-                    if first_video_time == "0":
+                    # 新的存档记录
+                    if first_video_time is None:
                         first_video_time = str(video_info["video_time"])
 
                     for video_part_id in video_info["video_part_id_list"]:
@@ -234,13 +225,6 @@ class Download(threading.Thread):
                             tool.process_exit()
 
                         log.step(account_name + " 开始下载第%s个视频 %s" % (video_count, video_info_response.extra_info["video_url"]))
-
-                        # 第一个视频，创建目录
-                        if need_make_video_dir:
-                            if not tool.make_dir(video_path, 0):
-                                log.error(account_name + " 创建图片下载目录 %s 失败" % video_path)
-                                tool.process_exit()
-                            need_make_video_dir = False
 
                         file_type = video_info_response.extra_info["video_url"].split(".")[-1].split("?")[0]
                         file_path = os.path.join(video_path, "%04d.%s" % (video_count, file_type))
@@ -260,7 +244,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s个视频" % (video_count - 1))
 
             # 排序
-            if IS_SORT and video_count > 1:
+            if video_count > 1:
                 log.step(account_name + " 视频开始从下载目录移动到保存目录")
                 destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
                 if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
@@ -270,7 +254,7 @@ class Download(threading.Thread):
                     tool.process_exit()
 
             # 新的存档记录
-            if first_video_time != "0":
+            if first_video_time is not None:
                 self.account_info[3] = str(int(self.account_info[3]) + video_count - 1)
                 self.account_info[4] = first_video_time
 

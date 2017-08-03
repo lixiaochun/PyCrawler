@@ -18,7 +18,6 @@ TOTAL_IMAGE_COUNT = 0
 IMAGE_TEMP_PATH = ""
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 
 
 # 获取账号相册首页
@@ -31,7 +30,7 @@ def get_account_index_page(account_name):
     }
     if account_index_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         user_id = tool.find_sub_string(account_index_response.data, '"nsid":"', '"')
-        if user_id and robot.is_integer(user_id):
+        if robot.is_integer(user_id):
             extra_info["user_id"] = user_id
         site_key = tool.find_sub_string(account_index_response.data, '"site_key":"', '"')
         if site_key:
@@ -99,7 +98,6 @@ class Flickr(robot.Robot):
         global IMAGE_TEMP_PATH
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
 
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
@@ -110,7 +108,6 @@ class Flickr(robot.Robot):
         # 设置全局变量，供子线程调用
         IMAGE_TEMP_PATH = self.image_temp_path
         IMAGE_DOWNLOAD_PATH = self.image_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
     def main(self):
@@ -175,12 +172,6 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
-            else:
-                image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-
             # 获取相册首页页面
             account_index_response = get_account_index_page(account_name)
             if account_index_response.status != net.HTTP_RETURN_CODE_SUCCEED:
@@ -192,12 +183,11 @@ class Download(threading.Thread):
             # 生成一个随机的request id用作访问（模拟页面传入）
             request_id = tool.generate_random_string(8)
 
-            # 图片
             image_count = 1
             page_count = 1
-            first_image_time = "0"
             is_over = False
-            need_make_image_dir = True
+            first_image_time = None
+            image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析第%s页图片" % page_count)
 
@@ -218,25 +208,19 @@ class Download(threading.Thread):
                         log.error(account_name + " 图片信息%s的上传时间解析失败" % image_info["json_data"])
                         tool.process_exit()
 
-                    # 检查是否是上一次的最后视频
+                    # 检查是否达到存档记录
                     if int(self.account_info[2]) >= int(image_info["image_time"]):
                         is_over = True
                         break
 
-                    # 将第一张图片的上传时间做为新的存档记录
-                    if first_image_time == "0":
+                    # 新的存档记录
+                    if first_image_time is None:
                         first_image_time = image_info["image_time"]
 
                     if image_info["image_url"] is None:
                         log.error(account_name + "图片信息%s的下载地址解析失败" % image_info["json_data"])
                         tool.process_exit()
                     log.step(account_name + " 开始下载第%s张图片 %s" % (image_count, image_info["image_url"]))
-
-                    if need_make_image_dir:
-                        if not tool.make_dir(image_path, 0):
-                            log.error(account_name + " 创建图片下载目录 %s 失败" % image_path)
-                            tool.process_exit()
-                        need_make_image_dir = False
 
                     file_type = image_info["image_url"].split(".")[-1]
                     file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
@@ -256,7 +240,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s张图片" % (image_count - 1))
 
             # 排序
-            if IS_SORT and image_count > 1:
+            if image_count > 1:
                 destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
                 if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
                     log.step(account_name + " 图片从下载目录移动到保存目录成功")
@@ -265,7 +249,7 @@ class Download(threading.Thread):
                     tool.process_exit()
 
             # 新的存档记录
-            if first_image_time != "0":
+            if first_image_time is not None:
                 self.account_info[1] = str(int(self.account_info[1]) + image_count - 1)
                 self.account_info[2] = first_image_time
 

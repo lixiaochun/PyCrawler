@@ -24,7 +24,6 @@ IMAGE_DOWNLOAD_PATH = ""
 VIDEO_TEMP_PATH = ""
 VIDEO_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 IS_DOWNLOAD_IMAGE = True
 IS_DOWNLOAD_VIDEO = True
 
@@ -38,7 +37,7 @@ def get_account_index_page(account_name):
     }
     if account_index_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         account_id = tool.find_sub_string(account_index_response.data, '"profilePage_', '"')
-        if account_id and robot.is_integer(account_id):
+        if robot.is_integer(account_id):
             extra_info["account_id"] = account_id
     account_index_response.extra_info = extra_info
     return account_index_response
@@ -179,7 +178,6 @@ class Instagram(robot.Robot):
         global VIDEO_TEMP_PATH
         global VIDEO_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
         global IS_DOWNLOAD_IMAGE
         global IS_DOWNLOAD_VIDEO
 
@@ -195,7 +193,6 @@ class Instagram(robot.Robot):
         IMAGE_DOWNLOAD_PATH = self.image_download_path
         VIDEO_TEMP_PATH = self.video_temp_path
         VIDEO_DOWNLOAD_PATH = self.video_download_path
-        IS_SORT = self.is_sort
         IS_DOWNLOAD_IMAGE = self.is_download_image
         IS_DOWNLOAD_VIDEO = self.is_download_video
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
@@ -263,14 +260,6 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
-                video_path = os.path.join(VIDEO_TEMP_PATH, account_name)
-            else:
-                image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-                video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-
             # 获取首页
             account_index_response = get_account_index_page(account_name)
             if account_index_response.status == 404:
@@ -294,10 +283,10 @@ class Download(threading.Thread):
             image_count = 1
             video_count = 1
             cursor = ""
-            first_created_time = "0"
             is_over = False
-            need_make_image_dir = True
-            need_make_video_dir = True
+            first_created_time = None
+            image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
+            video_path = os.path.join(VIDEO_TEMP_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析cursor '%s'的媒体信息" % cursor)
 
@@ -318,13 +307,13 @@ class Download(threading.Thread):
                         log.error(account_name + " 媒体信息%s解析失败" % media_info.extra_info["json_data"])
                         tool.process_exit()
 
-                    # 检查是否已下载到前一次的图片
+                    # 检查是否达到存档记录
                     if int(media_info["time"]) <= int(self.account_info[4]):
                         is_over = True
                         break
 
-                    # 将第一张图片的上传时间做为新的存档记录
-                    if first_created_time == "0":
+                    # 新的存档记录
+                    if first_created_time is None:
                         first_created_time = media_info["time"]
 
                     log.step(account_name + " 开始解析媒体%s" % media_info["page_id"])
@@ -364,13 +353,6 @@ class Download(threading.Thread):
                             image_url = "%s://%s//%s" % (image_url_protocol, image_url_host, image_url_name)
                             log.step(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
 
-                            # 第一张图片，创建目录
-                            if need_make_image_dir:
-                                if not tool.make_dir(image_path, 0):
-                                    log.error(account_name + " 创建图片下载目录 %s 失败" % image_path)
-                                    tool.process_exit()
-                                need_make_image_dir = False
-
                             file_type = image_url.split(".")[-1]
                             image_file_path = os.path.join(image_path, "%04d.%s" % (image_count, file_type))
                             save_file_return = net.save_net_file(image_url, image_file_path)
@@ -399,13 +381,6 @@ class Download(threading.Thread):
                         for video_url in media_response.extra_info["video_url_list"]:
                             log.step(account_name + " 开始下载第%s个视频 %s" % (video_count, video_url))
 
-                            # 第一个视频，创建目录
-                            if need_make_video_dir:
-                                if not tool.make_dir(video_path, 0):
-                                    log.error(account_name + " 创建视频下载目录 %s 失败" % video_path)
-                                    tool.process_exit()
-                                need_make_video_dir = False
-
                             file_type = video_url.split(".")[-1]
                             video_file_path = os.path.join(video_path, "%04d.%s" % (video_count, file_type))
                             save_file_return = net.save_net_file(video_url, video_file_path)
@@ -424,26 +399,25 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s张图片和%s个视频" % (image_count - 1, video_count - 1))
 
             # 排序
-            if IS_SORT:
-                if image_count > 1:
-                    log.step(account_name + " 图片开始从下载目录移动到保存目录")
-                    destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
-                    if robot.sort_file(image_path, destination_path, int(self.account_info[2]), 4):
-                        log.step(account_name + " 图片从下载目录移动到保存目录成功")
-                    else:
-                        log.error(account_name + " 创建图片保存目录 %s 失败" % destination_path)
-                        tool.process_exit()
-                if video_count > 1:
-                    log.step(account_name + " 视频开始从下载目录移动到保存目录")
-                    destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-                    if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
-                        log.step(account_name + " 视频从下载目录移动到保存目录成功")
-                    else:
-                        log.error(account_name + " 创建视频保存目录 %s 失败" % destination_path)
-                        tool.process_exit()
+            if image_count > 1:
+                log.step(account_name + " 图片开始从下载目录移动到保存目录")
+                destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
+                if robot.sort_file(image_path, destination_path, int(self.account_info[2]), 4):
+                    log.step(account_name + " 图片从下载目录移动到保存目录成功")
+                else:
+                    log.error(account_name + " 创建图片保存目录 %s 失败" % destination_path)
+                    tool.process_exit()
+            if video_count > 1:
+                log.step(account_name + " 视频开始从下载目录移动到保存目录")
+                destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
+                if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
+                    log.step(account_name + " 视频从下载目录移动到保存目录成功")
+                else:
+                    log.error(account_name + " 创建视频保存目录 %s 失败" % destination_path)
+                    tool.process_exit()
 
             # 新的存档记录
-            if first_created_time != "0":
+            if first_created_time is not None:
                 self.account_info[2] = str(int(self.account_info[2]) + image_count - 1)
                 self.account_info[3] = str(int(self.account_info[3]) + video_count - 1)
                 self.account_info[4] = first_created_time

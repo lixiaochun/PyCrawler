@@ -38,7 +38,7 @@ def get_account_index_page(account_name):
 # 解析相册id
 def get_album_id(album_url):
     album_id = tool.find_sub_string(album_url, "pp/", ".html")
-    if album_id and robot.is_integer(album_id):
+    if robot.is_integer(album_id):
         return str(album_id)
     return None
 
@@ -65,7 +65,6 @@ class Photographer(robot.Robot):
     def __init__(self):
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
 
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
@@ -74,7 +73,6 @@ class Photographer(robot.Robot):
 
         # 设置全局变量，供子线程调用
         IMAGE_DOWNLOAD_PATH = self.image_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
     def main(self):
@@ -151,11 +149,9 @@ class Download(threading.Thread):
 
             log.step(account_name + " 解析的所有相册地址：%s" % account_index_response.extra_info["album_url_list"])
 
-            # 下载
             total_image_count = 0
             album_count = 0
-            first_album_id = "0"
-            need_make_download_dir = True
+            first_album_id = None
             image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name)
             for album_url in account_index_response.extra_info["album_url_list"]:
                 album_id = get_album_id(album_url)
@@ -163,12 +159,12 @@ class Download(threading.Thread):
                     log.error(account_name + " 相册地址 %s 解析相册id失败" % album_url)
                     tool.process_exit()
 
-                # 检查是否相册id小于上次的记录
+                # 检查是否达到存档记录
                 if int(album_id) <= int(self.account_info[1]):
                     break
 
-                # 将第一个相册的id做为新的存档记录
-                if first_album_id == "0":
+                # 新的存档记录
+                if first_album_id is None:
                     first_album_id = album_id
 
                 log.step(account_name + " 开始解析第相册%s" % album_id)
@@ -183,12 +179,6 @@ class Download(threading.Thread):
                     tool.process_exit()
 
                 log.step(account_name + " 相册%s解析的所有图片地址：%s" % (album_id, album_response.extra_info["image_url_list"]))
-
-                if need_make_download_dir:
-                    if not tool.make_dir(image_path, 0):
-                        log.error(account_name + " 创建下载目录 %s 失败" % image_path)
-                        tool.process_exit()
-                    need_make_download_dir = False
 
                 # 过滤标题中不支持的字符
                 album_title = robot.filter_text(album_response.extra_info["album_title"])
@@ -222,7 +212,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s张图片" % total_image_count)
 
             # 新的存档记录
-            if first_album_id != "0":
+            if first_album_id is not None:
                 self.account_info[1] = first_album_id
 
             # 保存最后的信息

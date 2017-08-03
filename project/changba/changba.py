@@ -30,7 +30,7 @@ def get_account_index_page(account_id):
     if account_index_response.status == net.HTTP_RETURN_CODE_SUCCEED:
         # 获取user id
         user_id = tool.find_sub_string(account_index_response.data, "var userid = '", "'")
-        if user_id and robot.is_integer(user_id):
+        if robot.is_integer(user_id):
             extra_info["user_id"] = str(user_id)
     account_index_response.extra_info = extra_info
     return account_index_response
@@ -195,8 +195,6 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-
             # 查找账号user id
             account_index_response = get_account_index_page(account_id)
             if account_index_response.status != net.HTTP_RETURN_CODE_SUCCEED:
@@ -209,10 +207,10 @@ class Download(threading.Thread):
 
             page_count = 1
             video_count = 1
-            first_audio_id = "0"
             unique_list = []
             is_over = False
-            need_make_download_dir = True
+            first_audio_id = None
+            video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析第%s页歌曲" % page_count)
 
@@ -223,7 +221,7 @@ class Download(threading.Thread):
                     tool.process_exit()
 
                 # 如果为空，表示已经取完了
-                if audit_pagination_response.extra_info["audio_info_list"] is []:
+                if len(audit_pagination_response.extra_info["audio_info_list"]) == 0:
                     break
 
                 log.trace(account_name + " 第%s页解析的所有歌曲：%s" % (page_count, audit_pagination_response.extra_info["audio_info_list"]))
@@ -233,13 +231,13 @@ class Download(threading.Thread):
                         log.error(account_name + " 歌曲信息%s解析失败" % audio_info["json_data"])
                         tool.process_exit()
 
-                    # 检查是否已下载到前一次的歌曲
+                    # 检查是否达到存档记录
                     if int(audio_info["audio_id"]) <= int(self.account_info[1]):
                         is_over = True
                         break
 
-                    # 将第一首歌曲的id做为新的存档记录
-                    if first_audio_id == "0":
+                    # 新的存档记录
+                    if first_audio_id is None:
                         first_audio_id = audio_info["audio_id"]
 
                     # 新增歌曲导致的重复判断
@@ -264,13 +262,6 @@ class Download(threading.Thread):
                     audio_url = audio_play_response.extra_info["audio_url"]
                     log.step(account_name + " 开始下载第%s首歌曲《%s》 %s" % (video_count, audio_info["audio_title"], audio_url))
 
-                    # 第一首歌曲，创建目录
-                    if need_make_download_dir:
-                        if not tool.make_dir(video_path, 0):
-                            log.error(account_name + " 创建歌曲下载目录 %s 失败" % video_path)
-                            tool.process_exit()
-                        need_make_download_dir = False
-
                     file_path = os.path.join(video_path, "%s - %s.mp3" % (audio_info["audio_id"], audio_info["audio_title"]))
                     save_file_return = net.save_net_file(audio_url, file_path)
                     if save_file_return["status"] == 1:
@@ -290,7 +281,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s首歌曲" % (video_count - 1))
 
             # 新的存档记录
-            if first_audio_id != "0":
+            if first_audio_id is not None:
                 self.account_info[1] = first_audio_id
 
             # 保存最后的信息

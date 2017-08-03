@@ -19,7 +19,6 @@ TOTAL_IMAGE_COUNT = 0
 IMAGE_TEMP_PATH = ""
 IMAGE_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 
 
 # 获取指定token后的一页相册
@@ -137,7 +136,6 @@ class GooglePlus(robot.Robot):
         global IMAGE_TEMP_PATH
         global IMAGE_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
 
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
@@ -148,7 +146,6 @@ class GooglePlus(robot.Robot):
         # 设置全局变量，供子线程调用
         IMAGE_TEMP_PATH = self.image_temp_path
         IMAGE_DOWNLOAD_PATH = self.image_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
     def main(self):
@@ -221,18 +218,11 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
-            else:
-                image_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_file_path, account_name)
-
-            # 图片下载
             image_count = 1
             key = ""
-            first_album_id = "0"
             is_over = False
-            need_make_download_dir = True
+            first_album_id = None
+            image_path = os.path.join(IMAGE_TEMP_PATH, account_name)
             while not is_over:
                 log.step(account_name + " 开始解析 %s 相册页" % key)
 
@@ -260,13 +250,13 @@ class Download(threading.Thread):
                         log.error(account_name + " 日志信息%s的日志时间解析失败" % blog_info["json_data"])
                         tool.process_exit()
 
-                    # 检查是否已下载到前一次的日志
+                    # 检查是否达到存档记录
                     if blog_info["blog_time"] <= int(self.account_info[2]):
                         is_over = True
                         break
 
-                    # 将第一个日志的id做为新的存档记录
-                    if first_album_id == "0":
+                    # 新的存档记录
+                    if first_album_id is None:
                         first_album_id = str(blog_info["blog_time"])
 
                     log.step(account_name + " 开始解析日志 %s" % blog_info["blog_id"])
@@ -290,13 +280,6 @@ class Download(threading.Thread):
                             continue
 
                         log.step(account_name + " 开始下载第%s张图片 %s" % (image_count, image_url))
-
-                        # 第一张图片，创建目录
-                        if need_make_download_dir:
-                            if not tool.make_dir(image_path, 0):
-                                log.error(account_name + " 创建图片下载目录 %s 失败" % image_path)
-                                tool.process_exit()
-                            need_make_download_dir = False
 
                         file_path = os.path.join(image_path, "%04d.jpg" % image_count)
                         retry_count = 0
@@ -328,7 +311,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s张图片" % (image_count - 1))
 
             # 排序
-            if IS_SORT and image_count > 1:
+            if image_count > 1:
                 log.step(account_name + " 图片开始从下载目录移动到保存目录")
                 destination_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_file_path, account_name)
                 if robot.sort_file(image_path, destination_path, int(self.account_info[1]), 4):
@@ -338,7 +321,7 @@ class Download(threading.Thread):
                     tool.process_exit()
 
             # 新的存档记录
-            if first_album_id != "0":
+            if first_album_id is not None:
                 self.account_info[1] = str(int(self.account_info[1]) + image_count - 1)
                 self.account_info[2] = first_album_id
 

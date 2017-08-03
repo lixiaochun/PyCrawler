@@ -17,7 +17,6 @@ TOTAL_VIDEO_COUNT = 0
 VIDEO_TEMP_PATH = ""
 VIDEO_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
-IS_SORT = True
 
 
 # 获取所有的视频信息列表
@@ -118,7 +117,6 @@ class NicoNico(robot.Robot):
         global VIDEO_TEMP_PATH
         global VIDEO_DOWNLOAD_PATH
         global NEW_SAVE_DATA_PATH
-        global IS_SORT
 
         sys_config = {
             robot.SYS_DOWNLOAD_VIDEO: True,
@@ -129,7 +127,6 @@ class NicoNico(robot.Robot):
         # 设置全局变量，供子线程调用
         VIDEO_TEMP_PATH = self.video_temp_path
         VIDEO_DOWNLOAD_PATH = self.video_download_path
-        IS_SORT = self.is_sort
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
 
     def main(self):
@@ -198,12 +195,6 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            # 如果需要重新排序则使用临时文件夹，否则直接下载到目标目录
-            if IS_SORT:
-                video_path = os.path.join(VIDEO_TEMP_PATH, account_name)
-            else:
-                video_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
-
             # 获取视频信息列表
             account_index_response = get_account_index_page(account_id)
             if account_index_response.status != net.HTTP_RETURN_CODE_SUCCEED:
@@ -211,8 +202,8 @@ class Download(threading.Thread):
                 tool.process_exit()
 
             video_count = 1
-            first_video_id = "0"
-            need_make_video_dir = True
+            first_video_id = None
+            video_path = os.path.join(VIDEO_TEMP_PATH, account_name)
             for video_info in account_index_response.extra_info["video_info_list"]:
                 if not robot.check_sub_key(("item_data",), video_info) or \
                         not robot.check_sub_key(("watch_id", "title"), video_info["item_data"]):
@@ -224,13 +215,6 @@ class Download(threading.Thread):
 
                 # 过滤标题中不支持的字符
                 video_title = robot.filter_text(video_info["item_data"]["title"])
-
-                # 第一个视频，创建目录
-                if need_make_video_dir:
-                    if not tool.make_dir(video_path, 0):
-                        log.error(account_name + " 创建图片下载目录 %s 失败" % video_path)
-                        tool.process_exit()
-                    need_make_video_dir = False
 
                 # 获取视频下载地址
                 video_url = get_video_url(video_id)
@@ -247,7 +231,7 @@ class Download(threading.Thread):
             log.step(account_name + " 下载完毕，总共获得%s个视频" % (video_count - 1))
 
             # 排序
-            if IS_SORT and video_count > 1:
+            if video_count > 1:
                 log.step(account_name + " 视频开始从下载目录移动到保存目录")
                 destination_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name)
                 if robot.sort_file(video_path, destination_path, int(self.account_info[3]), 4):
@@ -257,7 +241,7 @@ class Download(threading.Thread):
                     tool.process_exit()
 
             # 新的存档记录
-            if first_video_id != "0":
+            if first_video_id is not None:
                 self.account_info[1] = first_video_id
 
             # 保存最后的信息
