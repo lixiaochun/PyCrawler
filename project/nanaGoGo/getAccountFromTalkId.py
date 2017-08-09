@@ -30,24 +30,23 @@ def get_member_from_talk(talk_id):
     talk_index_url = "https://7gogo.jp/%s" % talk_id
     talk_index_response = net.http_request(talk_index_url)
     account_list = {}
-    if talk_index_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-        talk_data_string = tool.find_sub_string(talk_index_response.data, "window.__STATES__ = ", "</script>")
-        if not talk_data_string:
-            raise robot.RobotException("页面截取talk信息失败\n%s" % talk_index_response.data)
-        try:
-            talk_data = json.loads(talk_data_string)
-        except ValueError:
-            raise robot.RobotException("talk信息加载失败\n%s" % talk_data_string)
-        if not robot.check_sub_key(("TalkStore",), talk_data):
-            raise robot.RobotException("talk信息'TalkStore'字段不存在\n%s" % talk_data)
-        if not robot.check_sub_key(("memberList",), talk_data["TalkStore"]):
-            raise robot.RobotException("talk信息'memberList'字段不存在\n%s" % talk_data)
-        for member_info in talk_data["TalkStore"]["memberList"]:
-            if not robot.check_sub_key(("userId", "name"), member_info):
-                raise robot.RobotException("参与者信息'userId'或'name'字段不存在\n%s" % talk_data)
-            account_list[str(member_info["userId"])] = str(member_info["name"].encode("UTF-8")).replace(" ", "")
-    else:
+    if talk_index_response.status != net.HTTP_RETURN_CODE_SUCCEED:
         raise robot.RobotException(robot.get_http_request_failed_reason(talk_index_response.status))
+    talk_data_string = tool.find_sub_string(talk_index_response.data, "window.__STATES__ = ", "</script>")
+    if not talk_data_string:
+        raise robot.RobotException("页面截取talk信息失败\n%s" % talk_index_response.data)
+    try:
+        talk_data = json.loads(talk_data_string)
+    except ValueError:
+        raise robot.RobotException("talk信息加载失败\n%s" % talk_data_string)
+    if not robot.check_sub_key(("TalkStore",), talk_data):
+        raise robot.RobotException("talk信息'TalkStore'字段不存在\n%s" % talk_data)
+    if not robot.check_sub_key(("memberList",), talk_data["TalkStore"]):
+        raise robot.RobotException("talk信息'memberList'字段不存在\n%s" % talk_data)
+    for member_info in talk_data["TalkStore"]["memberList"]:
+        if not robot.check_sub_key(("userId", "name"), member_info):
+            raise robot.RobotException("参与者信息'userId'或'name'字段不存在\n%s" % talk_data)
+        account_list[str(member_info["userId"])] = str(member_info["name"].encode("UTF-8")).replace(" ", "")
     return account_list
 
 
@@ -58,10 +57,13 @@ def main():
     account_list_from_save_data = get_account_from_save_data(save_data_path)
     account_list = []
     for talk_id in account_list_from_save_data:
-        member_list = get_member_from_talk(talk_id)
+        try:
+            member_list = get_member_from_talk(talk_id)
+        except robot.RobotException, e:
+            tool.print_msg(talk_id + " 获取成员失败，原因：%s" % e.message)
         for account_id in member_list:
             if account_id not in account_list:
-                print account_id, member_list[account_id]
+                tool.print_msg("%s %s" % (account_id, member_list[account_id]))
                 tool.write_file("%s\t%s" % (account_id, member_list[account_id]), ACCOUNT_ID_FILE_PATH, 1)
                 account_list.append(account_id)
 

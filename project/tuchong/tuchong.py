@@ -24,10 +24,10 @@ IS_DOWNLOAD_IMAGE = True
 # 获取账号首页
 def get_account_index_page(account_name):
     if robot.is_integer(account_name):
-        account_index_url = "https://www.tuchong.com/%s" % account_name
+        account_index_url = "https://tuchong.com/%s" % account_name
     else:
         account_index_url = "https://%s.tuchong.com" % account_name
-    account_index_response = net.http_request(account_index_url)
+    account_index_response = net.http_request(account_index_url, redirect=False)
     result = {
         "account_id": None,  # account id（字母账号->数字账号)
     }
@@ -38,6 +38,8 @@ def get_account_index_page(account_name):
         if not robot.is_integer(account_id):
             raise robot.RobotException("site id类型不正确\n%s" % account_index_response.data)
         result["account_id"] = account_id
+    elif account_index_response.status == 301 and account_index_response.getheader("Location") == "https://tuchong.com/":
+        raise robot.RobotException("账号不存在")
     else:
         raise robot.RobotException(robot.get_http_request_failed_reason(account_index_response.status))
     return result
@@ -55,44 +57,39 @@ def get_one_page_album(account_id, post_time):
         "is_error": False,  # 是不是格式不符合
         "album_info_list": [],  # 所有图片信息
     }
-    if album_pagination_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-        if not robot.check_sub_key(("posts", "result"), album_pagination_response.json_data):
-            raise robot.RobotException("返回数据'posts'或者'result'字段不存在\n%s" % album_pagination_response.json_data)
-        if album_pagination_response.json_data["result"] != "SUCCESS":
-            raise robot.RobotException("返回数据'result'字段取值不正确\n%s" % album_pagination_response.json_data)
-        for album_info in album_pagination_response.json_data["posts"]:
-            extra_image_info = {
-                "album_id": None,  # 相册id
-                "album_time": None,  # 相册创建时间
-                "album_title": "",  # 相册标题
-                "image_url_list": [],  # 所有图片地址
-            }
-            # 获取相册id
-            if not robot.check_sub_key(("post_id",), album_info):
-                raise robot.RobotException("相册信息'post_id'字段不存在\n%s" % album_info)
-            if not robot.is_integer(album_info["post_id"]):
-                raise robot.RobotException("相册信息'post_id'字段类型不正确\n%s" % album_info)
-            extra_image_info["album_id"] = str(album_info["post_id"])
-
-            # 获取相册标题
-            extra_image_info["album_title"] = str(album_info["title"].encode("UTF-8"))
-
-            # 获取图片地址
-            for image_info in album_info["images"]:
-                if not robot.check_sub_key(("img_id",), image_info):
-                    raise robot.RobotException("相册信息'img_id'字段不存在\n%s" % album_info)
-                extra_image_info["image_url_list"].append("https://photo.tuchong.com/%s/f/%s.jpg" % (account_id, str(image_info["img_id"])))
-            if len(extra_image_info["image_url_list"]) == 0:
-                raise robot.RobotException("相册信息匹配图片地址失败\n%s" % album_info)
-
-            # 获取相册创建时间
-            if not robot.check_sub_key(("published_at",), album_info):
-                raise robot.RobotException("相册信息'published_at'字段不存在\n%s" % album_info)
-            result["album_time"] = str(album_info["published_at"])
-
-            result["album_info_list"].append(extra_image_info)
-    else:
+    if album_pagination_response.status != net.HTTP_RETURN_CODE_SUCCEED:
         raise robot.RobotException(robot.get_http_request_failed_reason(album_pagination_response.status))
+    if not robot.check_sub_key(("posts", "result"), album_pagination_response.json_data):
+        raise robot.RobotException("返回数据'posts'或者'result'字段不存在\n%s" % album_pagination_response.json_data)
+    if album_pagination_response.json_data["result"] != "SUCCESS":
+        raise robot.RobotException("返回数据'result'字段取值不正确\n%s" % album_pagination_response.json_data)
+    for album_info in album_pagination_response.json_data["posts"]:
+        extra_image_info = {
+            "album_id": None,  # 相册id
+            "album_time": None,  # 相册创建时间
+            "album_title": "",  # 相册标题
+            "image_url_list": [],  # 所有图片地址
+        }
+        # 获取相册id
+        if not robot.check_sub_key(("post_id",), album_info):
+            raise robot.RobotException("相册信息'post_id'字段不存在\n%s" % album_info)
+        if not robot.is_integer(album_info["post_id"]):
+            raise robot.RobotException("相册信息'post_id'字段类型不正确\n%s" % album_info)
+        extra_image_info["album_id"] = str(album_info["post_id"])
+        # 获取相册标题
+        extra_image_info["album_title"] = str(album_info["title"].encode("UTF-8"))
+        # 获取图片地址
+        for image_info in album_info["images"]:
+            if not robot.check_sub_key(("img_id",), image_info):
+                raise robot.RobotException("相册信息'img_id'字段不存在\n%s" % album_info)
+            extra_image_info["image_url_list"].append("https://photo.tuchong.com/%s/f/%s.jpg" % (account_id, str(image_info["img_id"])))
+        if len(extra_image_info["image_url_list"]) == 0:
+            raise robot.RobotException("相册信息匹配图片地址失败\n%s" % album_info)
+        # 获取相册创建时间
+        if not robot.check_sub_key(("published_at",), album_info):
+            raise robot.RobotException("相册信息'published_at'字段不存在\n%s" % album_info)
+        result["album_time"] = str(album_info["published_at"])
+        result["album_info_list"].append(extra_image_info)
     return result
 
 
@@ -176,15 +173,12 @@ class Download(threading.Thread):
         try:
             log.step(account_name + " 开始")
 
-            if account_name.isdigit():
-                account_id = account_name
-            else:
-                try:
-                    account_index_response = get_account_index_page(account_name)
-                except robot.RobotException, e:
-                    log.error(account_name + " 主页解析失败，原因：%s" % e.message)
-                    raise
-                account_id = account_index_response["account_id"]
+            try:
+                account_index_response = get_account_index_page(account_name)
+            except robot.RobotException, e:
+                log.error(account_name + " 主页解析失败，原因：%s" % e.message)
+                raise
+            account_id = account_index_response["account_id"]
 
             this_account_total_image_count = 0
             post_count = 0
@@ -208,7 +202,7 @@ class Download(threading.Thread):
 
                 log.trace(account_name + " %s后的一页相册：%s" % (post_time, album_pagination_response["album_info_list"]))
 
-                for album_info in album_pagination_response["album_inf  o_list"]:
+                for album_info in album_pagination_response["album_info_list"]:
                     # 检查是否达到存档记录
                     if int(album_info["album_id"]) <= int(self.account_info[1]):
                         is_over = True
