@@ -32,18 +32,18 @@ def get_one_page_album(album_id):
         elif album_pagination_response.status != net.HTTP_RETURN_CODE_SUCCEED:
             raise robot.RobotException("第%s页 " % page_count + robot.get_http_request_failed_reason(album_pagination_response.status))
         if page_count == 1:
-            # 获取图集图片总数
-            image_count = tool.find_sub_string(album_pagination_response.data, "<p>图片数量：", "张</p>").strip()
-            if not robot.is_integer(image_count):
-                raise robot.RobotException("页面截取图片总数失败\n%s" % album_pagination_response.data)
-            image_count = int(image_count)
             # 获取图集标题
             result["album_title"] = str(tool.find_sub_string(album_pagination_response.data, "<h1>", "</h1>")).strip()
         # 获取图集图片地址
-        image_url_list = re.findall('<img src="([^"]*)"', tool.find_sub_string(album_pagination_response.data, '<div class="content">', "</div>"))
+        image_list_html = tool.find_sub_string(album_pagination_response.data, '<div class="content">', "</div>")
+        if not image_list_html:
+            raise robot.RobotException("第%s页 页面截取图片列表失败\n%s" % (page_count, album_pagination_response.data))
+        image_url_list = re.findall('<img src="([^"]*)"', image_list_html)
         if len(image_url_list) == 0:
-            raise robot.RobotException("第%s页 页面匹配图片地址失败\n%s" % (page_count, album_pagination_response.data))
-        result["image_url_list"] += map(str, image_url_list)
+            if image_list_html.strip() != "<center></center>":
+                raise robot.RobotException("第%s页 图片列表匹配图片地址失败\n%s" % (page_count, album_pagination_response.data))
+        else:
+            result["image_url_list"] += map(str, image_url_list)
         # 判断是不是最后一页
         page_count_find = re.findall('">(\d*)</a>', tool.find_sub_string(album_pagination_response.data, '<div id="pages">', "</div>"))
         if len(page_count_find) > 0:
@@ -51,9 +51,6 @@ def get_one_page_album(album_id):
         else:
             max_page_count = 1
         page_count += 1
-    # 判断页面上的总数和实际地址数量是否一致
-    if image_count != len(result["image_url_list"]):
-        log.error("图集%s 页面截取的图片数量 %s 和显示的总数 %s 不一致" % (album_id, image_count, len(result["image_url_list"])))
     return result
 
 
