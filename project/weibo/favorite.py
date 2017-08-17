@@ -39,9 +39,9 @@ def get_one_page_favorite(page_count):
     html_data = html_data.replace(chr(1), "\\")
     # 解析页面
     children_selector = pq(html_data.decode("UTF-8")).find('div.WB_feed').children()
-    if len(children_selector.size()) == 0:
+    if children_selector.size() == 0:
         raise robot.RobotException("匹配收藏信息失败\n%s" % favorite_data_html)
-    if len(children_selector.size()) == 1:
+    if children_selector.size() == 1:
         raise robot.RobotException("没有收藏了")
     # 解析日志id和图片地址
     for i in range(0, children_selector.size() - 1):
@@ -81,7 +81,7 @@ def get_one_page_favorite(page_count):
     # 最后一条feed是分页信息
     page_selector = children_selector.eq(children_selector.size() - 1)
     # 判断是不是最后一页
-    page_count_find = re.findall("第([\d]*)页",  page_selector.html())
+    page_count_find = re.findall("第(\d*)页",  page_selector.html().encode("UTF-8"))
     if len(page_count_find) > 0:
         page_count_find = map(int, page_count_find)
         result["is_over"] = page_count >= max(page_count_find)
