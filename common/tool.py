@@ -261,9 +261,8 @@ def find_sub_string(string, start_string=None, end_string=None, include_string=0
 # 文件路径编码转换
 def change_path_encoding(path):
     if isinstance(path, str):
-        return unicode(path, "UTF-8")
-    else:
-        return path
+        path = unicode(path, "UTF-8")
+    return os.path.realpath(path)
 
 
 # 读取文件
@@ -279,8 +278,14 @@ def read_file(file_path, read_type=1):
     with open(file_path, "r") as file_handle:
         if read_type == 1:
             result = file_handle.read()
+            if result[-1] == "\n":
+                result = result[:-1]
         else:
-            result = file_handle.readlines()
+            result = []
+            for line in file_handle.readlines():
+                if line[-1] == "\n":
+                    line = line[:-1]
+                result.append(line)
     return result
 
 
@@ -288,12 +293,12 @@ def read_file(file_path, read_type=1):
 # type=1: 追加
 # type=2: 覆盖
 def write_file(msg, file_path, append_type=1):
+    file_path = change_path_encoding(file_path)
     if make_dir(os.path.dirname(file_path), 0):
         if append_type == 1:
             open_type = "a"
         else:
             open_type = "w"
-        file_path = change_path_encoding(file_path)
         with open(file_path, open_type) as file_handle:
             if isinstance(msg, unicode):
                 msg = msg.encode("UTF-8")
