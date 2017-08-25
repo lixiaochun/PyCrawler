@@ -16,8 +16,8 @@ import time
 import threading
 if platform.system() == "Windows":
     import win32crypt
-
-# 初始化操作
+# if sys.stdout.encoding != "UTF-8":
+#     raise Exception("项目编码必须是UTF-8，请在IDE中修改相关设置")
 if sys.version_info < (2, 7, 12):
     raise Exception("python版本过低，请访问官网 https://www.python.org/downloads/ 更新")
 elif sys.version_info >= (3,):
@@ -92,6 +92,9 @@ def get_cookie_value_from_browser(cookie_key, file_path, browser_type, target_do
             if cookie_info[4] == cookie_key:
                 return cookie_info[5]
     elif browser_type == 3:
+        # chrome仅支持windows系统的解密
+        if platform.system() != "Windows":
+            return None
         con = sqlite3.connect(os.path.join(file_path, "Cookies"))
         cur = con.cursor()
         cur.execute("select host_key, path, secure, expires_utc, name, value, encrypted_value from cookies")
@@ -167,6 +170,9 @@ def get_all_cookie_from_browser(browser_type, file_path):
                 all_cookies[cookie_domain] = {}
             all_cookies[cookie_domain][cookie_key] = cookie_value
     elif browser_type == 3:
+        # chrome仅支持windows系统的解密
+        if platform.system() != "Windows":
+            return None
         con = sqlite3.connect(os.path.join(file_path, "Cookies"))
         cur = con.cursor()
         cur.execute("select host_key, path, secure, expires_utc, name, value, encrypted_value from cookies")
@@ -191,13 +197,17 @@ def print_msg(msg, is_time=True):
     if is_time:
         msg = get_time() + " " + msg
     thread_lock.acquire()
-    # 终端输出编码
-    output_encoding = sys.stdout.encoding
-    if output_encoding == "UTF-8":
-        print msg
-    else:
-        print msg.decode("UTF-8").encode(output_encoding)
-    thread_lock.release()
+    try:
+        # 终端输出编码
+        output_encoding = sys.stdout.encoding
+        if output_encoding == "UTF-8":
+            print msg
+        else:
+            print msg.decode("UTF-8").encode(output_encoding)
+    except:
+        raise
+    finally:
+        thread_lock.release()
 
 
 # 控制台输入
