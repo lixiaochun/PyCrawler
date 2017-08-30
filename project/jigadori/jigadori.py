@@ -75,7 +75,7 @@ class Jigadori(robot.Robot):
     def main(self):
         # 解析存档文件
         # image_count last_blog_time
-        save_info = [0, 0]
+        save_info = ["0", "0"]
         if os.path.exists(self.save_data_path):
             file_save_info = tool.read_file(self.save_data_path).split("\t")
             if len(file_save_info) >= 2 and robot.is_integer(file_save_info[0]) and robot.is_integer(file_save_info[1]):
@@ -106,6 +106,7 @@ class Jigadori(robot.Robot):
 
             log.trace("第%s页解析的所有图片：%s" % (page_count, photo_pagination_response["image_info_list"]))
 
+            # 寻找这一页符合条件的图片
             for image_info in photo_pagination_response["image_info_list"]:
                 # 新增图片导致的重复判断
                 if image_info["tweet_id"] in unique_list:
@@ -128,7 +129,7 @@ class Jigadori(robot.Robot):
         # 从最早的图片开始下载
         while len(image_info_list) > 0:
             image_info = image_info_list.pop()
-            log.step("开始解析tweet%s的图片" % image_info["tweet_id"])
+            log.step("开始解析tweet %s的图片" % image_info["tweet_id"])
 
             image_index = int(save_info[0]) + 1
             temp_path_list = []
@@ -143,11 +144,12 @@ class Jigadori(robot.Robot):
                     file_path = os.path.join(self.image_download_path, "%05d_%s.%s" % (image_index, image_info["account_name"], file_type))
                     save_file_return = net.save_net_file(image_url, file_path)
                     if save_file_return["status"] == 1:
+                        # 设置临时目录
                         temp_path_list.append(file_path)
                         log.step("第%s张图片下载成功" % image_index)
                         image_index += 1
                     else:
-                        log.error("第%s张图片（account_id：%s) %s，下载失败，原因：%s" % (image_index, image_info["account_name"], image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
+                        log.error("第%s张图片（account：%s) %s，下载失败，原因：%s" % (image_index, image_info["account_name"], image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
             except SystemExit:
                 # 如果临时目录变量不为空，表示某个日志正在下载中，需要把下载了部分的内容给清理掉
                 if len(temp_path_list) > 0:
@@ -155,7 +157,7 @@ class Jigadori(robot.Robot):
                         tool.remove_dir_or_file(temp_path)
                 log.step("提前退出")
                 break
-            # tweet图片全部下载完毕
+            # tweet内图片全部下载完毕
             total_image_count += (image_index - 1) - int(save_info[0])  # 计数累加
             save_info[0] = str(image_index - 1)  # 设置存档记录
             save_info[1] = str(image_info["tweet_time"])  # 设置存档记录
