@@ -163,15 +163,8 @@ class Robot(object):
                 self.print_msg("图片保存目录%s创建失败！" % self.image_download_path)
                 tool.process_exit()
                 return
-            # 图片临时下载目录
-            if "image_temp_path" in extra_config:
-                self.image_temp_path = extra_config["image_temp_path"]
-            else:
-                self.image_temp_path = get_config(config, "IMAGE_TEMP_PATH", "\\\\tempImage", 3)
-            # 图片下载数量，0为下载全部可用资源
         else:
             self.image_download_path = ""
-            self.image_temp_path = ""
         # 是否需要下载视频
         if self.is_download_video:
             # 视频保存目录
@@ -184,14 +177,8 @@ class Robot(object):
                 self.print_msg("视频保存目录%s创建失败！" % self.video_download_path)
                 tool.process_exit()
                 return
-            # 视频下载临时目录
-            if "video_temp_path" in extra_config:
-                self.video_temp_path = extra_config["video_temp_path"]
-            else:
-                self.video_temp_path = get_config(config, "VIDEO_TEMP_PATH", "\\\\tempVideo", 3)
         else:
             self.video_download_path = ""
-            self.video_temp_path = ""
 
         # 代理
         is_proxy = get_config(config, "IS_PROXY", 2, 1)
@@ -270,17 +257,6 @@ class Robot(object):
     # 获取程序已运行时间（seconds）
     def get_run_time(self):
         return int(time.time() - self.start_time)
-
-    # 下载逻辑完成后手动调用，进行一些收尾工作
-    def finish_task(self):
-        if self.image_temp_path:
-            tool.delete_null_dir(self.image_temp_path)
-            if os.path.exists(self.image_temp_path):
-                self.print_msg("图片临时下载目录%s中存在文件" % self.image_temp_path)
-        if self.video_temp_path:
-            tool.delete_null_dir(self.video_temp_path)
-            if os.path.exists(self.video_temp_path):
-                self.print_msg("视频临时下载目录%s中存在文件" % self.video_temp_path)
 
 
 # 读取配置文件
