@@ -77,7 +77,6 @@ def get_post_page(post_id):
     if not robot.check_sub_key(("pictures", "imageCount", "videoCount"), index_response.json_data["result"]):
         raise robot.RobotException("返回信息'pictures'、'imageCount'或'videoCount'字段不存在\n%s" % index_response.json_data)
     for media_info in index_response.json_data["result"]["pictures"]:
-        print media_info
         if not robot.check_sub_key(("url",), media_info):
             raise robot.RobotException("返回信息'url'字段不存在\n%s" % media_info)
         if not robot.check_sub_key(("type",), media_info):
@@ -96,7 +95,6 @@ def get_post_page(post_id):
                 result["image_url_list"].append(str(media_info["thum"]))
         else:
             raise robot.RobotException("返回信息'type'字段取值不正确\n%s" % media_info)
-        print result
     return result
 
 
@@ -126,7 +124,7 @@ class PrPr(robot.Robot):
 
         # 解析存档文件
         # account_id last_post_time
-        account_list = robot.read_save_data(self.save_data_path, 0, ["", ""])
+        account_list = robot.read_save_data(self.save_data_path, 0, ["", "0"])
         ACCOUNTS = account_list.keys()
 
         # 循环下载每个id
@@ -177,8 +175,10 @@ class Download(threading.Thread):
         global TOTAL_VIDEO_COUNT
 
         account_id = self.account_info[0]
-        # todo 是否有需要显示不同名字
-        account_name = account_id
+        if len(self.account_info) > 2 and self.account_info[2]:
+            account_name = self.account_info[2]
+        else:
+            account_name = account_id
         total_image_count = 0
         total_video_count = 0
         temp_path_list = []
