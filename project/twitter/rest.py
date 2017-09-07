@@ -18,6 +18,15 @@ ACCESS_TOKEN = None
 
 
 def init():
+    config = robot.read_config(tool.PROJECT_CONFIG_PATH)
+    # 设置代理
+    is_proxy = robot.get_config(config, "IS_PROXY", 2, 1)
+    if is_proxy == 1 or is_proxy == 2:
+        proxy_ip = robot.get_config(config, "PROXY_IP", "127.0.0.1", 0)
+        proxy_port = robot.get_config(config, "PROXY_PORT", "8087", 0)
+        # 使用代理的线程池
+        net.set_proxy(proxy_ip, proxy_port)
+
     api_key = None
     api_secret = None
     if ACCESS_TOKEN is not None:
@@ -89,6 +98,20 @@ def get_user_info_by_user_id(user_id):
     if response.status == net.HTTP_RETURN_CODE_SUCCEED:
         return response.json_data
     return {}
+
+
+# 关注指定用户
+def follow_account(user_id):
+    api_url = _get_api_url("friendships/create.json")
+    api_url += "?user_id=%s" % user_id
+    header_list = {
+        "Authorization": "Bearer %s" % ACCESS_TOKEN,
+    }
+    response = net.http_request(api_url, method="POST", header_list=header_list, json_decode=True)
+    print response.status
+    if response.status == net.HTTP_RETURN_CODE_SUCCEED:
+        pass
+    return False
 
 
 init()

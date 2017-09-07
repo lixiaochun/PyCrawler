@@ -73,9 +73,17 @@ def main():
     account_list_from_api = get_account_from_index()
     if len(account_list_from_api) > 0:
         account_list_from_save_data = get_account_from_save_data()
+        for account_id in account_list_from_save_data:
+            if account_id not in account_list_from_api:
+                tool.print_msg("%s (%s) not found from API result" % (account_id, account_list_from_save_data[account_id]))
         for account_id in account_list_from_api:
             if account_id not in account_list_from_save_data:
                 account_list_from_save_data[account_id] = "%s\t\t\t\t\t%s" % (account_id, account_list_from_api[account_id])
+            else:
+                temp_list = account_list_from_save_data[account_id].split("\t")
+                if len(temp_list) >= 6 and temp_list[5] != account_list_from_api[account_id]:
+                    tool.print_msg("%s name changed" % account_id)
+                    account_list_from_save_data[account_id] = "\t".join(temp_list)
         temp_list = [account_list_from_save_data[key] for key in sorted(account_list_from_save_data.keys())]
         tool.write_file(tool.list_to_string(temp_list, "\n", ""), SAVE_DATA_PATH, 2)
 

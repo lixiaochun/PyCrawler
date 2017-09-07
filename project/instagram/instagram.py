@@ -24,6 +24,7 @@ VIDEO_DOWNLOAD_PATH = ""
 NEW_SAVE_DATA_PATH = ""
 IS_DOWNLOAD_IMAGE = True
 IS_DOWNLOAD_VIDEO = True
+COOKIE_INFO = {}
 
 
 # 根据账号名字获得账号id（字母账号->数字账号)
@@ -48,11 +49,12 @@ def get_account_index_page(account_name):
 # 获取指定页数的全部媒体
 # account_id -> 490060609
 def get_one_page_media(account_id, cursor):
+    api_url = "https://www.instagram.com/graphql/query/"
     if cursor:
-        media_pagination_url = "https://www.instagram.com/graphql/query/?query_id=%s&id=%s&first=%s&after=%s" % (QUERY_ID, account_id, IMAGE_COUNT_PER_PAGE, cursor)
+        media_pagination_url = api_url + "?query_id=%s&id=%s&first=%s&after=%s" % (QUERY_ID, account_id, IMAGE_COUNT_PER_PAGE, cursor)
     else:
-        media_pagination_url = "https://www.instagram.com/graphql/query/?query_id=%s&id=%s&first=%s" % (QUERY_ID, account_id, IMAGE_COUNT_PER_PAGE)
-    media_pagination_response = net.http_request(media_pagination_url, json_decode=True)
+        media_pagination_url = api_url + "?query_id=%s&id=%s&first=%s" % (QUERY_ID, account_id, IMAGE_COUNT_PER_PAGE)
+    media_pagination_response = net.http_request(media_pagination_url, cookies_list=COOKIE_INFO, json_decode=True)
     result = {
         "media_info_list": [],  # 全部媒体信息
         "next_page_cursor": None,  # 下一页媒体信息的指针
@@ -62,21 +64,25 @@ def get_one_page_media(account_id, cursor):
         time.sleep(60)
         return get_one_page_media(account_id, cursor)
     elif media_pagination_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-        if not robot.check_sub_key(("status", "data"), media_pagination_response.json_data):
-            raise robot.RobotException("返回数据'status'或'data'字段不存在\n%s" % media_pagination_response.json_data)
-        if not robot.check_sub_key(("user",), media_pagination_response.json_data["data"]):
-            raise robot.RobotException("返回数据'user'字段不存在\n%s" % media_pagination_response.json_data)
-        if not robot.check_sub_key(("edge_owner_to_timeline_media",), media_pagination_response.json_data["data"]["user"]):
-            raise robot.RobotException("返回数据'edge_owner_to_timeline_media'字段不存在\n%s" % media_pagination_response.json_data)
-        if not robot.check_sub_key(("page_info", "edges",), media_pagination_response.json_data["data"]["user"]["edge_owner_to_timeline_media"]):
-            raise robot.RobotException("返回数据'page_info', 'edges'字段不存在\n%s" % media_pagination_response.json_data)
-        if not robot.check_sub_key(("end_cursor", "has_next_page",), media_pagination_response.json_data["data"]["user"]["edge_owner_to_timeline_media"]["page_info"]):
-            raise robot.RobotException("返回数据'end_cursor', 'has_next_page'字段不存在\n%s" % media_pagination_response.json_data)
-        if not isinstance(media_pagination_response.json_data["data"]["user"]["edge_owner_to_timeline_media"]["edges"], list):
-            raise robot.RobotException("返回数据'edges'字段类型不正确\n%s" % media_pagination_response.json_data)
-        if len(media_pagination_response.json_data["data"]["user"]["edge_owner_to_timeline_media"]["edges"]) == 0:
-            raise robot.RobotException("返回数据'edges'字段长度不正确\n%s" % media_pagination_response.json_data)
-        media_node = media_pagination_response.json_data["data"]["user"]["edge_owner_to_timeline_media"]
+        json_data = media_pagination_response.json_data
+        if not robot.check_sub_key(("status", "data"), json_data):
+            raise robot.RobotException("返回数据'status'或'data'字段不存在\n%s" % json_data)
+        if not robot.check_sub_key(("user",), json_data["data"]):
+            raise robot.RobotException("返回数据'user'字段不存在\n%s" % json_data)
+        if not robot.check_sub_key(("edge_owner_to_timeline_media",), json_data["data"]["user"]):
+            raise robot.RobotException("返回数据'edge_owner_to_timeline_media'字段不存在\n%s" % json_data)
+        if not robot.check_sub_key(("page_info", "edges", "count"), json_data["data"]["user"]["edge_owner_to_timeline_media"]):
+            raise robot.RobotException("返回数据'page_info', 'edges', 'count'字段不存在\n%s" % json_data)
+        if not robot.check_sub_key(("end_cursor", "has_next_page",), json_data["data"]["user"]["edge_owner_to_timeline_media"]["page_info"]):
+            raise robot.RobotException("返回数据'end_cursor', 'has_next_page'字段不存在\n%s" % json_data)
+        if not isinstance(json_data["data"]["user"]["edge_owner_to_timeline_media"]["edges"], list):
+            raise robot.RobotException("返回数据'edges'字段类型不正确\n%s" % json_data)
+        if len(json_data["data"]["user"]["edge_owner_to_timeline_media"]["edges"]) == 0:
+            if cursor == "" and int(json_data["data"]["user"]["edge_owner_to_timeline_media"]["count"]) > 0:
+                raise robot.RobotException("私密账号，需要关注才能访问")
+            else:
+                raise robot.RobotException("返回数据'edges'字段长度不正确\n%s" % json_data)
+        media_node = json_data["data"]["user"]["edge_owner_to_timeline_media"]
         for media_info in media_node["edges"]:
             result_media_info = {
                 "image_url": None,  # 图片地址
@@ -188,11 +194,13 @@ class Instagram(robot.Robot):
         global NEW_SAVE_DATA_PATH
         global IS_DOWNLOAD_IMAGE
         global IS_DOWNLOAD_VIDEO
+        global COOKIE_INFO
 
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
             robot.SYS_DOWNLOAD_VIDEO: True,
             robot.SYS_SET_PROXY: True,
+            robot.SYS_GET_COOKIE: {"www.instagram.com": ()},
         }
         robot.Robot.__init__(self, sys_config, extra_config)
 
@@ -202,6 +210,7 @@ class Instagram(robot.Robot):
         IS_DOWNLOAD_IMAGE = self.is_download_image
         IS_DOWNLOAD_VIDEO = self.is_download_video
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
+        COOKIE_INFO = self.cookie_value
 
     def main(self):
         global ACCOUNTS
