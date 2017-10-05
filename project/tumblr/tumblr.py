@@ -26,6 +26,7 @@ IS_DOWNLOAD_IMAGE = True
 IS_DOWNLOAD_VIDEO = True
 COOKIE_INFO = {}
 USER_AGENT = None
+IS_STEP_ERROR_403_AND_404 = True
 
 
 # 获取一页的日志地址列表
@@ -85,42 +86,44 @@ def get_post_page(post_url):
     og_type = tool.find_sub_string(post_page_head, '<meta property="og:type" content="', '" />')
     if not og_type:
         raise robot.RobotException("正文截取og_type失败\n%s" % post_page_head)
-    # 空、音频、引用，跳过
-    if og_type in ["tumblr-feed:entry", "tumblr-feed:audio", "tumblr-feed:quote", "tumblr-feed:link"]:
-        pass
+    # 视频
+    if og_type == "tumblr-feed:video":
+        result["has_video"] = True
+        # 获取图片地址
+        image_url = tool.find_sub_string(post_page_head, '<meta property="og:image" content="', '" />')
+        if image_url and image_url != "http://assets.tumblr.com/images/og/fb_landscape_share.png":
+            result["image_url_list"].append(image_url)
     else:
-        # 视频
-        if og_type == "tumblr-feed:video":
-            result["has_video"] = True
-            # 获取图片地址
-            image_url = tool.find_sub_string(post_page_head, '<meta property="og:image" content="', '" />')
-            if image_url and image_url != "http://assets.tumblr.com/images/og/fb_landscape_share.png":
-                result["image_url_list"].append(image_url)
-        else:
-            # 获取全部图片地址
-            image_url_list = re.findall('"(http[s]?://\w*[.]?media.tumblr.com/[^"]*)"', post_page_head)
-            new_image_url_list = {}
-            for image_url in image_url_list:
-                # 头像，跳过
-                if image_url.find("/avatar_") != -1:
+        # 获取全部图片地址
+        image_url_list = re.findall('"(http[s]?://\w*[.]?media.tumblr.com/[^"]*)"', post_page_head)
+        new_image_url_list = {}
+        for image_url in image_url_list:
+            # 头像，跳过
+            if image_url.find("/avatar_") != -1:
+                continue
+            image_id = image_url[image_url.find("media.tumblr.com/") + len("media.tumblr.com/"):].split("_")[0]
+            # 判断是否有分辨率更小的相同图片
+            if image_id in new_image_url_list:
+                resolution = image_url.split("_")[-1].split(".")[0]
+                if resolution == "cover":
+                    log.error("image_url: " + image_url + ", old_image_url: " + new_image_url_list[image_id])
                     continue
-                image_id = image_url[image_url.find("media.tumblr.com/") + len("media.tumblr.com/"):].split("_")[0]
-                # 判断是否有分辨率更小的相同图片
-                if image_id in new_image_url_list:
-                    resolution = image_url.split("_")[-1].split(".")[0]
-                    if resolution[-1] == "h":
-                        resolution = int(resolution[:-1])
-                    else:
-                        resolution = int(resolution)
-                    old_resolution = new_image_url_list[image_id].split("_")[-1].split(".")[0]
-                    if old_resolution[-1] == "h":
-                        old_resolution = int(old_resolution[:-1])
-                    else:
-                        old_resolution = int(old_resolution)
-                    if resolution < old_resolution:
-                        continue
-                new_image_url_list[image_id] = image_url
-            result["image_url_list"] = new_image_url_list.values()
+                elif resolution[-1] == "h":
+                    resolution = int(resolution[:-1])
+                else:
+                    resolution = int(resolution)
+                old_resolution = new_image_url_list[image_id].split("_")[-1].split(".")[0]
+                if old_resolution == "cover":
+                    log.error("image_url: " + image_url + ", old_image_url: " + new_image_url_list[image_id])
+                    old_resolution = 0
+                elif old_resolution[-1] == "h":
+                    old_resolution = int(old_resolution[:-1])
+                else:
+                    old_resolution = int(old_resolution)
+                if resolution < old_resolution:
+                    continue
+            new_image_url_list[image_id] = image_url
+        result["image_url_list"] = new_image_url_list.values()
     return result
 
 
@@ -179,13 +182,14 @@ class Tumblr(robot.Robot):
         global IS_DOWNLOAD_VIDEO
         global COOKIE_INFO
         global USER_AGENT
+        global IS_STEP_ERROR_403_AND_404
 
         sys_config = {
             robot.SYS_DOWNLOAD_IMAGE: True,
             robot.SYS_DOWNLOAD_VIDEO: True,
             robot.SYS_GET_COOKIE: {".tumblr.com": ()},
             robot.SYS_SET_PROXY: True,
-            robot.SYS_APP_CONFIG: (os.path.realpath("config.ini"), ("USER_AGENT", "", 0)),
+            robot.SYS_APP_CONFIG: (os.path.realpath("config.ini"), ("USER_AGENT", "", 0), ("IS_STEP_ERROR_403_AND_404", True, 2)),
         }
         robot.Robot.__init__(self, sys_config)
 
@@ -197,6 +201,7 @@ class Tumblr(robot.Robot):
         NEW_SAVE_DATA_PATH = robot.get_new_save_file_path(self.save_data_path)
         COOKIE_INFO = self.cookie_value
         USER_AGENT = self.app_config["USER_AGENT"]
+        IS_STEP_ERROR_403_AND_404 = self.app_config["IS_STEP_ERROR_403_AND_404"]
 
     def main(self):
         global ACCOUNTS
@@ -354,7 +359,12 @@ class Download(threading.Thread):
                                 temp_path_list.append(video_file_path)
                                 log.step(account_id + " 第%s个视频下载成功" % video_index)
                                 break
-                        log.error(account_id + " 第%s个视频 %s 下载失败（%s），原因：%s" % (video_index, video_url, post_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
+                        error_message = account_id + " 第%s个视频 %s 下载失败（%s），原因：%s" % (video_index, video_url, post_url, robot.get_save_net_file_failed_reason(save_file_return["code"]))
+                        # 403、404错误作为step log输出
+                        if IS_STEP_ERROR_403_AND_404 and save_file_return["code"] in [403, 404]:
+                            log.step(error_message)
+                        else:
+                            log.error(error_message)
                     break
 
                 # 图片下载
@@ -367,21 +377,19 @@ class Download(threading.Thread):
 
                         file_type = image_url.split(".")[-1]
                         image_file_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_id, "%04d.%s" % (image_index, file_type))
-                        retry_count = 0
-                        while True:
-                            save_file_return = net.save_net_file(image_url, image_file_path)
-                            if save_file_return["status"] == 1:
-                                # 设置临时目录
-                                temp_path_list.append(image_file_path)
-                                log.step(account_id + " 第%s张图片下载成功" % image_index)
-                                image_index += 1
-                            # 下载失败，并且http_code不是403和404，重试
-                            elif save_file_return["status"] == 0 and save_file_return["code"] not in [403, 404] and retry_count <= 5:
-                                retry_count += 1
-                                continue
+                        save_file_return = net.save_net_file(image_url, image_file_path)
+                        if save_file_return["status"] == 1:
+                            # 设置临时目录
+                            temp_path_list.append(image_file_path)
+                            log.step(account_id + " 第%s张图片下载成功" % image_index)
+                            image_index += 1
+                        else:
+                            error_message = account_id + " 第%s张图片 %s 下载失败（%s），原因：%s" % (image_index, image_url, post_url, robot.get_save_net_file_failed_reason(save_file_return["code"]))
+                            # 403、404错误作为step log输出
+                            if IS_STEP_ERROR_403_AND_404 and save_file_return["code"] in [403, 404]:
+                                log.step(error_message)
                             else:
-                                log.error(account_id + " 第%s张图片 %s 下载失败（%s），原因：%s" % (image_index, image_url, post_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
-                            break
+                                log.error(error_message)
 
                 # 日志内图片和视频全部下载完毕
                 temp_path_list = []  # 临时目录设置清除
