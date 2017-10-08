@@ -91,7 +91,7 @@ def get_post_page(post_url):
         result["has_video"] = True
         # 获取图片地址
         image_url = tool.find_sub_string(post_page_head, '<meta property="og:image" content="', '" />')
-        if image_url and image_url != "http://assets.tumblr.com/images/og/fb_landscape_share.png":
+        if image_url and image_url.find("assets.tumblr.com/images/og/fb_landscape_share.png") == -1:
             result["image_url_list"].append(image_url)
     else:
         # 获取全部图片地址
@@ -106,7 +106,6 @@ def get_post_page(post_url):
             if image_id in new_image_url_list:
                 resolution = image_url.split("_")[-1].split(".")[0]
                 if resolution == "cover":
-                    log.error("image_url: " + image_url + ", old_image_url: " + new_image_url_list[image_id])
                     continue
                 elif resolution[-1] == "h":
                     resolution = int(resolution[:-1])
@@ -114,7 +113,6 @@ def get_post_page(post_url):
                     resolution = int(resolution)
                 old_resolution = new_image_url_list[image_id].split("_")[-1].split(".")[0]
                 if old_resolution == "cover":
-                    log.error("image_url: " + image_url + ", old_image_url: " + new_image_url_list[image_id])
                     old_resolution = 0
                 elif old_resolution[-1] == "h":
                     old_resolution = int(old_resolution[:-1])
