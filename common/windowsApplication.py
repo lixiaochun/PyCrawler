@@ -7,6 +7,7 @@ email: hikaru870806@hotmail.com
 """
 from common import keyboardEvent, process
 import pywintypes
+import time
 import win32api
 import win32con
 import win32gui
@@ -75,11 +76,20 @@ class WindowsApplication:
         win32gui.SetWindowPos(self.window_handle, 0, pos_x, pos_y, 0, 0, win32con.SWP_NOSIZE | win32con.SWP_NOZORDER)
 
     # 自动点击窗口某个坐标（窗口可以不在最顶端）
-    def auto_click(self, pos_x, pos_y):
+    def auto_click(self, pos_x, pos_y, click_time=0):
         tmp = win32api.MAKELONG(pos_x, pos_y)
         win32gui.SendMessage(self.window_handle, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
         win32gui.SendMessage(self.window_handle, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, tmp)
+        if click_time > 0:
+            time.sleep(click_time)
         win32gui.SendMessage(self.window_handle, win32con.WM_LBUTTONUP, win32con.MK_LBUTTON, tmp)
+
+    def move_click(self, pos_x, pos_y, click_time=0):
+        win32api.SetCursorPos((pos_x, pos_y))
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0)
+        if click_time > 0:
+            time.sleep(click_time)
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0)
 
     # 自动向窗口发送按键指令（必须在前台激活窗口）
     def send_key(self, keyboard):
