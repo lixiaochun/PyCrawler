@@ -5,7 +5,7 @@ steam相关数据解析爬虫
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
-from common import net, robot, tool
+from common import *
 from pyquery import PyQuery as pq
 import json
 import os
@@ -223,10 +223,10 @@ def get_login_cookie_from_browser():
     # cookie
     is_auto_get_cookie = robot.get_config(config, "IS_AUTO_GET_COOKIE", True, 4)
     if is_auto_get_cookie:
-        cookie_path = robot.tool.get_default_browser_cookie_path(browser_type)
+        cookie_path = browser.get_default_browser_cookie_path(browser_type)
     else:
         cookie_path = robot.get_config(config, "COOKIE_PATH", "", 0)
-    all_cookie_from_browser = tool.get_all_cookie_from_browser(browser_type, cookie_path)
+    all_cookie_from_browser = browser.get_all_cookie_from_browser(browser_type, cookie_path)
     if "store.steampowered.com" not in all_cookie_from_browser:
         raise robot.RobotException("浏览器解析cookies失败\n%s" % all_cookie_from_browser)
     if "steamLogin" in all_cookie_from_browser["store.steampowered.com"]:

@@ -7,9 +7,7 @@ email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
 from common import *
-import os
 import re
-import sys
 
 
 # 从cookie中获取登录的auth_token
@@ -20,10 +18,10 @@ def get_auth_token():
     # cookie
     is_auto_get_cookie = robot.get_config(config, "IS_AUTO_GET_COOKIE", True, 4)
     if is_auto_get_cookie:
-        cookie_path = robot.tool.get_default_browser_cookie_path(browser_type)
+        cookie_path = browser.get_default_browser_cookie_path(browser_type)
     else:
         cookie_path = robot.get_config(config, "COOKIE_PATH", "", 0)
-    all_cookie_from_browser = tool.get_all_cookie_from_browser(browser_type, cookie_path)
+    all_cookie_from_browser = browser.get_all_cookie_from_browser(browser_type, cookie_path)
     if ".twitter.com" in all_cookie_from_browser and "auth_token" in all_cookie_from_browser[".twitter.com"]:
         return all_cookie_from_browser["www.instagram.com"]["sessionid"]
     return None
