@@ -101,8 +101,14 @@ def get_one_page_post(account_id, page_count, is_https, is_safe_mode):
 
 
 # 获取日志页面
-def get_post_page(post_url):
-    post_response = net.http_request(post_url, header_list={"User-Agent": USER_AGENT}, cookies_list=COOKIE_INFO)
+def get_post_page(post_url, is_safe_mode):
+    if is_safe_mode:
+        header_list = {"User-Agent": USER_AGENT}
+        cookies_list = COOKIE_INFO
+    else:
+        header_list = None
+        cookies_list = None
+    post_response = net.http_request(post_url, header_list=header_list, cookies_list=cookies_list)
     result = {
         "has_video": False,  # 是不是包含视频
         "image_url_list": [],  # 全部图片地址
@@ -167,13 +173,19 @@ def analysis_image(image_url):
         elif temp_list[-1][-1] == "h" and robot.is_integer(temp_list[-1][:-1]):
             resolution = int(temp_list[-1][:-1])
         # http://78.media.tumblr.com/tumblr_m9rwkpsRwt1rr15s5.jpg
-        elif len(temp_list) == 2:
+        # http://78.media.tumblr.com/afd60c3d469055cea4544fe848eeb266/tumblr_inline_n9gff0sXMl1rzbdqg.gif
+        elif len(temp_list) == 2 or (len(temp_list) == 3 and temp_list[1] == "inline"):
             pass
         else:
             log.error("unknown 1 image url: %s" % image_url)
     # http://78.media.tumblr.com/TVeEqrZktkygbzi2tUbbKMGXo1_1280.jpg
-    elif not robot.is_integer(temp_list[0]):
+    elif not robot.is_integer(temp_list[0]) and robot.is_integer(temp_list[-1]):
         image_id = temp_list[0]
+        resolution = int(temp_list[-1])
+    # http://78.media.tumblr.com/3562275_500.jpg
+    elif len(temp_list) == 2 and robot.is_integer(temp_list[0]) and robot.is_integer(temp_list[1]):
+        image_id = temp_list[0]
+        resolution = int(temp_list[1])
     else:
         image_id = image_url.split("/")[-1].split(".")[0]
         log.error("unknown 2 image url: %s" % image_url)
@@ -386,7 +398,7 @@ class Download(threading.Thread):
 
                 # 获取日志
                 try:
-                    post_response = get_post_page(post_url)
+                    post_response = get_post_page(post_url, is_safe_mode)
                 except robot.RobotException, e:
                     log.error(account_id + " 日志 %s 解析失败，原因：%s" % (post_url, e.message))
                     raise
