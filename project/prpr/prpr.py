@@ -98,6 +98,16 @@ def get_post_page(post_id):
     return result
 
 
+# 检测下载得文件是否有效
+def check_invalid(file_path):
+    if file_path.split(".")[-1] == "png" and os.path.getsize(file_path) < 102400:
+        if tool.get_file_md5(file_path) in ["76d8988358e84e123a126d736be4bc44", "0d527d84f1150d002998cb67ec271de5", "2423c99718385d789cec3e6c1c1020db",
+                                            "0764beb3d521b9b420d365f6ee6d453b", "1ba2863db2ac7296d73818be890ef378", "7a9abea08bc47d3a64f87eebdd533dcd",
+                                            "23e0a284d4fa44c222bf41d3cb58b241", "483ec66794f1dfa02d634c4745fd4ded", "dd77da050fc0bcf79d22d35deb1019bd"]:
+            return True
+    return False
+
+
 class PrPr(robot.Robot):
     def __init__(self):
         global IMAGE_DOWNLOAD_PATH
@@ -238,18 +248,20 @@ class Download(threading.Thread):
 
                         origin_image_url, file_param = image_url.split("?", 1)
                         file_name_and_type = origin_image_url.split("/")[-1]
-                        if file_param.find("/interlace/") >= 0:
-                            image_file_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name, "interlace", file_name_and_type)
-                        elif file_param.find("/blur/") >= 0:
+                        if file_param.find("/blur/") >= 0:
                             image_file_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name, "blur", file_name_and_type)
                         else:
                             image_file_path = os.path.join(IMAGE_DOWNLOAD_PATH, account_name, "other", file_name_and_type)
                         save_file_return = net.save_net_file(image_url, image_file_path, need_content_type=True)
                         if save_file_return["status"] == 1:
-                            # 设置临时目录
-                            temp_path_list.append(image_file_path)
-                            log.step(account_name + " 作品%s 第%s张图片 下载成功" % (post_info["post_id"], image_index))
-                            image_index += 1
+                            if check_invalid(save_file_return["file_path"]):
+                                path.delete_dir_or_file(save_file_return["file_path"])
+                                log.error(account_name + " 作品%s 第%s张图 %s 无效，已删除" % (post_info["post_id"], image_index, image_url))
+                            else:
+                                # 设置临时目录
+                                temp_path_list.append(image_file_path)
+                                log.step(account_name + " 作品%s 第%s张图片 下载成功" % (post_info["post_id"], image_index))
+                                image_index += 1
                         else:
                             log.error(account_name + " 作品%s 第%s张图片 %s 下载失败，原因：%s" % (post_info["post_id"], image_index, image_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
 
@@ -259,14 +271,17 @@ class Download(threading.Thread):
                     for video_url in blog_response["video_url_list"]:
                         log.step(account_name + " 作品%s 开始下载第%s个视频 %s" % (post_info["post_id"], video_index, video_url))
 
-                        file_type = video_url.split(".")[-1]
-                        video_file_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name, "%04d.%s" % (video_index, file_type))
+                        video_file_path = os.path.join(VIDEO_DOWNLOAD_PATH, account_name, "%s_%02d.mp4" % (post_info["post_id"], video_index))
                         save_file_return = net.save_net_file(video_url, video_file_path, need_content_type=True)
                         if save_file_return["status"] == 1:
-                            # 设置临时目录
-                            temp_path_list.append(video_file_path)
-                            log.step(account_name + " 作品%s 第%s个视频下载成功" % (post_info["post_id"], video_index))
-                            video_index += 1
+                            if check_invalid(save_file_return["file_path"]):
+                                path.delete_dir_or_file(save_file_return["file_path"])
+                                log.error(account_name + " 作品%s 第%s个视频 %s 无效，已删除" % (post_info["post_id"], video_index, video_url))
+                            else:
+                                # 设置临时目录
+                                temp_path_list.append(video_file_path)
+                                log.step(account_name + " 作品%s 第%s个视频下载成功" % (post_info["post_id"], video_index))
+                                video_index += 1
                         else:
                             log.error(account_name + " 作品%s 第%s个视频 %s 下载失败，原因：%s" % (post_info["post_id"], video_index, video_url, robot.get_save_net_file_failed_reason(save_file_return["code"])))
 
@@ -274,7 +289,7 @@ class Download(threading.Thread):
                 temp_path_list = []  # 临时目录设置清除
                 total_image_count += (image_index - 1)  # 计数累加
                 total_video_count += (video_index - 1)  # 计数累加
-                self.account_info[1] = post_info["post_time"]  # 设置存档记录
+                self.account_info[1] = str(post_info["post_time"])  # 设置存档记录
         except SystemExit, se:
             if se.code == 0:
                 log.step(account_name + " 提前退出")
