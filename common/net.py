@@ -137,6 +137,33 @@ def http_request(url, method="GET", fields=None, binary_data=None, header_list=N
     if HTTP_CONNECTION_POOL is None:
         init_http_connection_pool()
 
+    if header_list is None:
+        header_list = {}
+
+    # 设置User-Agent
+    if "User-Agent" not in header_list:
+        header_list["User-Agent"] = _random_user_agent()
+
+    # 设置一个随机IP
+    if is_random_ip:
+        random_ip = _random_ip_address()
+        header_list["X-Forwarded-For"] = random_ip
+        header_list["X-Real-Ip"] = random_ip
+
+    # 设置cookie
+    if cookies_list:
+        header_list["Cookie"] = build_header_cookie_string(cookies_list)
+
+    # 超时设置
+    if connection_timeout == 0 and read_timeout == 0:
+        timeout = None
+    elif connection_timeout == 0:
+        timeout = urllib3.Timeout(read=read_timeout)
+    elif read_timeout == 0:
+        timeout = urllib3.Timeout(connect=connection_timeout)
+    else:
+        timeout = urllib3.Timeout(connect=connection_timeout, read=read_timeout)
+
     retry_count = 0
     while True:
         while process.PROCESS_STATUS == process.PROCESS_STATUS_PAUSE:
@@ -144,32 +171,7 @@ def http_request(url, method="GET", fields=None, binary_data=None, header_list=N
         if process.PROCESS_STATUS == process.PROCESS_STATUS_STOP:
             tool.process_exit(0)
 
-        if header_list is None:
-            header_list = {}
-
-        # 设置User-Agent
-        if "User-Agent" not in header_list:
-            header_list["User-Agent"] = _random_user_agent()
-
-        # 设置一个随机IP
-        if is_random_ip:
-            random_ip = _random_ip_address()
-            header_list["X-Forwarded-For"] = random_ip
-            header_list["X-Real-Ip"] = random_ip
-
-        # 设置cookie
-        if cookies_list:
-            header_list["Cookie"] = build_header_cookie_string(cookies_list)
-
         try:
-            if connection_timeout == 0 and read_timeout == 0:
-                timeout = None
-            elif connection_timeout == 0:
-                timeout = urllib3.Timeout(read=read_timeout)
-            elif read_timeout == 0:
-                timeout = urllib3.Timeout(connect=connection_timeout)
-            else:
-                timeout = urllib3.Timeout(connect=connection_timeout, read=read_timeout)
             if method in ['DELETE', 'GET', 'HEAD', 'OPTIONS']:
                 response = HTTP_CONNECTION_POOL.request(method, url, headers=header_list, redirect=redirect, timeout=timeout, fields=fields)
             else:
@@ -196,6 +198,9 @@ def http_request(url, method="GET", fields=None, binary_data=None, header_list=N
                                 is_error = False
                     if is_error:
                         response.status = HTTP_RETURN_CODE_JSON_DECODE_ERROR
+            elif response.status in [500, 502, 503, 504]:  # 服务器临时性错误，重试
+                retry_count += 1
+                continue
             return response
         except urllib3.exceptions.ProxyError:
             notice = "无法访问代理服务器，请检查代理设置。检查完成后输入(C)ontinue继续程序或者(S)top退出程序："
@@ -211,24 +216,6 @@ def http_request(url, method="GET", fields=None, binary_data=None, header_list=N
             if str(e).find("[Errno 11004] getaddrinfo failed") >= 0:
                 return ErrorResponse(HTTP_RETURN_CODE_DOMAIN_NOT_RESOLVED)
             pass
-        # except urllib3.exceptions.MaxRetryError, e:
-        #     print_msg(url)
-        #     print_msg(str(e))
-        #     # 无限重定向
-        #     # if str(e).find("Caused by ResponseError('too many redirects',)") >= 0:
-        #     #     return ErrorResponse(-1)
-        # except urllib3.exceptions.ConnectTimeoutError, e:
-        #     print_msg(str(e))
-        #     print_msg(url + " 访问超时，稍后重试")
-        #     # 域名无法解析
-        #     # if str(e).find("[Errno 11004] getaddrinfo failed") >= 0:
-        #     #     return ErrorResponse(-2)
-        # except urllib3.exceptions.ProtocolError, e:
-        #     print_msg(str(e))
-        #     print_msg(url + " 访问超时，稍后重试")
-        #     # 链接被终止
-        #     # if str(e).find("'Connection aborted.', error(10054,") >= 0:
-        #     #     return ErrorResponse(-3)
         except Exception, e:
             if str(e).find("EOF occurred in violation of protocol") >=0:
                 time.sleep(30)
@@ -328,9 +315,6 @@ def save_net_file(file_url, file_path, need_content_type=False, header_list=None
             if create_file:
                 path.delete_dir_or_file(file_path)
             return {"status": 0, "code": -2}
-        # 500锡类错误，重试
-        elif response.status in [500, 502, 503, 504]:
-            pass
         # 其他http code，退出
         else:
             if create_file:
