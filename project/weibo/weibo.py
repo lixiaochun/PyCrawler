@@ -106,8 +106,8 @@ class Weibo(robot.Robot):
                 tool.process_exit()
 
         # 解析存档文件
-        # account_id  image_count  last_image_time  video_count  last_video_url  (account_name)
-        account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0", "0", ""])
+        # account_id  image_count  last_image_time  (account_name)
+        account_list = robot.read_save_data(self.save_data_path, 0, ["", "0", "0"])
         ACCOUNTS = account_list.keys()
 
         # 循环下载每个id
@@ -155,8 +155,8 @@ class Download(robot.DownloadThread):
         global TOTAL_IMAGE_COUNT
 
         account_id = self.account_info[0]
-        if len(self.account_info) >= 6 and self.account_info[5]:
-            account_name = self.account_info[5]
+        if len(self.account_info) >= 4 and self.account_info[3]:
+            account_name = self.account_info[3]
         else:
             account_name = self.account_info[0]
         total_image_count = 0
@@ -257,11 +257,10 @@ class Download(robot.DownloadThread):
             log.error(str(e) + "\n" + str(traceback.format_exc()))
 
         # 保存最后的信息
-        self.thread_lock.acquire()
-        tool.write_file("\t".join(self.account_info), NEW_SAVE_DATA_PATH)
-        TOTAL_IMAGE_COUNT += total_image_count
-        ACCOUNTS.remove(account_id)
-        self.thread_lock.release()
+        with self.thread_lock:
+            tool.write_file("\t".join(self.account_info), NEW_SAVE_DATA_PATH)
+            TOTAL_IMAGE_COUNT += total_image_count
+            ACCOUNTS.remove(account_id)
         log.step(account_name + " 下载完毕，总共获得%s张图片" % total_image_count)
 
 
