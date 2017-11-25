@@ -16,7 +16,6 @@ import thread
 import threading
 import time
 
-IS_INIT = False
 # 程序是否支持下载图片功能（会判断配置中是否需要下载图片，如全部是则创建图片下载目录）
 SYS_DOWNLOAD_IMAGE = "download_image"
 # 程序是否支持下载视频功能（会判断配置中是否需要下载视频，如全部是则创建视频下载目录）
@@ -51,7 +50,6 @@ class Robot(object):
 
     # 程序全局变量的设置
     def __init__(self, sys_config, extra_config=None):
-        global IS_INIT
         self.start_time = time.time()
 
         # 程序启动配置
@@ -87,23 +85,22 @@ class Robot(object):
                     self.app_config[app_config_template[0]] = analysis_config(app_config, app_config_template[0], app_config_template[1], app_config_template[2])
 
         # 日志
-        self.is_show_error = analysis_config(config, "IS_SHOW_ERROR", True, CONFIG_ANALYSIS_MODE_BOOLEAN)
-        self.is_show_step = analysis_config(config, "IS_SHOW_STEP", True, CONFIG_ANALYSIS_MODE_BOOLEAN)
-        self.is_show_trace = analysis_config(config, "IS_SHOW_TRACE", False, CONFIG_ANALYSIS_MODE_BOOLEAN)
+        log.IS_SHOW_ERROR = self.is_show_error = analysis_config(config, "IS_SHOW_ERROR", True, CONFIG_ANALYSIS_MODE_BOOLEAN)
+        log.IS_SHOW_STEP = self.is_show_step = analysis_config(config, "IS_SHOW_STEP", True, CONFIG_ANALYSIS_MODE_BOOLEAN)
+        log.IS_SHOW_TRACE = self.is_show_trace = analysis_config(config, "IS_SHOW_TRACE", False, CONFIG_ANALYSIS_MODE_BOOLEAN)
         error_log_path = analysis_config(config, "ERROR_LOG_PATH", "\\log/errorLog.txt", CONFIG_ANALYSIS_MODE_PATH)
-        self.error_log_path = replace_path(error_log_path)
+        log.ERROR_LOG_PATH = self.error_log_path = replace_path(error_log_path)
         error_log_dir = os.path.dirname(self.error_log_path)
-
         if not path.create_dir(error_log_dir):
             self.print_msg("创建错误日志目录 %s 失败" % error_log_dir)
             tool.process_exit()
             return
         is_log_step = analysis_config(config, "IS_LOG_STEP", True, CONFIG_ANALYSIS_MODE_BOOLEAN)
         if not is_log_step:
-            self.step_log_path = ""
+            log.STEP_LOG_PATH = self.step_log_path = ""
         else:
             step_log_path = analysis_config(config, "STEP_LOG_PATH", "\\log/stepLog.txt", CONFIG_ANALYSIS_MODE_PATH)
-            self.step_log_path = replace_path(step_log_path)
+            log.STEP_LOG_PATH = self.step_log_path = replace_path(step_log_path)
             # 日志文件保存目录
             step_log_dir = os.path.dirname(self.step_log_path)
             if not path.create_dir(step_log_dir):
@@ -112,25 +109,16 @@ class Robot(object):
                 return
         is_log_trace = analysis_config(config, "IS_LOG_TRACE", True, CONFIG_ANALYSIS_MODE_BOOLEAN)
         if not is_log_trace:
-            self.trace_log_path = ""
+            log.TRACE_LOG_PATH = self.trace_log_path = ""
         else:
             trace_log_path = analysis_config(config, "TRACE_LOG_PATH", "\\log/traceLog.txt", CONFIG_ANALYSIS_MODE_PATH)
-            self.trace_log_path = replace_path(trace_log_path)
+            log.TRACE_LOG_PATH = self.trace_log_path = replace_path(trace_log_path)
             # 日志文件保存目录
             trace_log_dir = os.path.dirname(self.trace_log_path)
             if not path.create_dir(trace_log_dir):
                 self.print_msg("创建调试日志目录 %s 失败" % trace_log_dir)
                 tool.process_exit()
                 return
-
-        if not IS_INIT:
-            log.IS_SHOW_ERROR = self.is_show_error
-            log.IS_SHOW_STEP = self.is_show_step
-            log.IS_SHOW_TRACE = self.is_show_trace
-            log.ERROR_LOG_PATH = self.error_log_path
-            log.STEP_LOG_PATH = self.step_log_path
-            log.TRACE_LOG_PATH = self.trace_log_path
-            IS_INIT = True
 
         # 是否下载
         self.is_download_image = analysis_config(config, "IS_DOWNLOAD_IMAGE", True, CONFIG_ANALYSIS_MODE_BOOLEAN) and sys_download_image
@@ -235,26 +223,19 @@ class Robot(object):
 
         # 键盘监控线程
         if analysis_config(config, "IS_KEYBOARD_EVENT", True, CONFIG_ANALYSIS_MODE_BOOLEAN):
-            # 进程阻塞标志
-            self.thread_event = threading.Event()
-            self.thread_event.set()
-
             keyboard_event_bind = {}
             pause_process_key = analysis_config(config, "PAUSE_PROCESS_KEYBOARD_KEY", "F9")
             # 暂停进程
             if pause_process_key:
-                keyboard_event_bind[pause_process_key] = process.pause_process
-                keyboard_event_bind[pause_process_key] = self.pause_process
+                keyboard_event_bind[pause_process_key] = net.pause_request
             # 继续进程
             continue_process_key = analysis_config(config, "CONTINUE_PROCESS_KEYBOARD_KEY", "F10")
             if continue_process_key:
-                keyboard_event_bind[continue_process_key] = process.continue_process
-                keyboard_event_bind[continue_process_key] = self.resume_process
+                keyboard_event_bind[continue_process_key] = net.resume_request
             # 结束进程（取消当前的线程，完成任务）
             stop_process_key = analysis_config(config, "STOP_PROCESS_KEYBOARD_KEY", "CTRL + F12")
             if stop_process_key:
                 keyboard_event_bind[stop_process_key] = process.stop_process
-                keyboard_event_bind[stop_process_key] = self.stop_process
 
             if keyboard_event_bind:
                 keyboard_control_thread = keyboardEvent.KeyboardEvent(keyboard_event_bind)
@@ -262,16 +243,6 @@ class Robot(object):
                 keyboard_control_thread.start()
 
         self.print_msg("初始化完成")
-
-    def pause_process(self):
-        """Set thread_event to False"""
-        output.print_msg("pause process")
-        self.thread_event.clear()
-
-    def resume_process(self):
-        """Set thread_event to True"""
-        output.print_msg("resume process")
-        self.thread_event.set()
 
     def stop_process(self):
         tool.process_exit(0)
