@@ -281,6 +281,16 @@ class DownloadThread(threading.Thread):
             self.thread_event.wait()
 
 
+class RobotException(SystemExit):
+    def __init__(self, msg=""):
+        SystemExit.__init__(self, 1)
+        self.exception_message = msg
+
+    @property
+    def message(self):
+        return  self.exception_message
+
+
 def read_config(config_path):
     """Read config file"""
     config = ConfigParser.SafeConfigParser()
@@ -387,7 +397,7 @@ def read_save_data(save_data_path, key_index, default_value_list):
 def rewrite_save_file(temp_save_data_path, save_data_path):
     account_list = read_save_data(temp_save_data_path, 0, [])
     temp_list = [account_list[key] for key in sorted(account_list.keys())]
-    tool.write_file(tool.list_to_string(temp_list), save_data_path, 2)
+    tool.write_file(tool.list_to_string(temp_list), save_data_path, tool.WRITE_FILE_TYPE_REPLACE)
     path.delete_dir_or_file(temp_save_data_path)
 
 
@@ -486,13 +496,3 @@ def get_http_request_failed_reason(return_code):
         return "未知错误，http code %s" % return_code
     else:
         return "未知错误，return code %s" % return_code
-
-
-class RobotException(SystemExit):
-    def __init__(self, msg=""):
-        SystemExit.__init__(self, 1)
-        self.exception_message = msg
-
-    @property
-    def message(self):
-        return  self.exception_message
