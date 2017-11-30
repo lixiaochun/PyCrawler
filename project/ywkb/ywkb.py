@@ -67,6 +67,8 @@ class YWKB(robot.Robot):
             is_over = False
             # 获取全部还未下载过需要解析的图片
             while not is_over:
+                if not self.is_running():
+                    tool.process_exit(0)
                 log.step("开始解析第%s页日志" % page_count)
 
                 try:
@@ -93,6 +95,8 @@ class YWKB(robot.Robot):
 
             # 从最早的图片开始下载
             while len(image_info_list) > 0:
+                if not self.is_running():
+                    tool.process_exit(0)
                 image_info = image_info_list.pop()
                 log.step("开始下载%s的图片 %s" % (image_info["image_id"], image_info["image_url"]))
 
@@ -121,7 +125,7 @@ class YWKB(robot.Robot):
             log.error(str(e) + "\n" + str(traceback.format_exc()))
 
         # 保存新的存档文件
-        tool.write_file(str(last_image_id), self.save_data_path, tool.WRITE_FILE_TYPE_APPEND)
+        tool.write_file(str(last_image_id), self.save_data_path, tool.WRITE_FILE_TYPE_REPLACE)
         log.step("全部下载完毕，耗时%s秒，共计图片%s张" % (self.get_run_time(), total_image_count))
 
 

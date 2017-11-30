@@ -95,6 +95,8 @@ class Jigadori(robot.Robot):
             is_over = False
             # 获取全部还未下载过需要解析的图片
             while not is_over:
+                if not self.is_running():
+                    tool.process_exit(0)
                 log.step("开始解析第%s页图片" % page_count)
 
                 # 获取一页图片
@@ -137,6 +139,8 @@ class Jigadori(robot.Robot):
 
                 image_index = int(save_info[0]) + 1
                 for image_url in image_info["image_url_list"]:
+                    if not self.is_running():
+                        tool.process_exit(0)
                     log.step("开始下载第%s张图片 %s" % (image_index, image_url))
 
                     if image_url.rfind("/") > image_url.rfind("."):
@@ -171,7 +175,7 @@ class Jigadori(robot.Robot):
             log.error(str(e) + "\n" + str(traceback.format_exc()))
 
         # 保存新的存档文件
-        tool.write_file("\t".join(save_info), self.save_data_path, tool.WRITE_FILE_TYPE_APPEND)
+        tool.write_file("\t".join(save_info), self.save_data_path, tool.WRITE_FILE_TYPE_REPLACE)
         log.step("全部下载完毕，耗时%s秒，共计图片%s张" % (self.get_run_time(), total_image_count))
 
 

@@ -72,6 +72,8 @@ class CNU(robot.Robot):
             # http://www.cnu.cc/about/ 全部作品
             # todo 获取最新的作品id
             while True:
+                if not self.is_running():
+                    tool.process_exit(0)
                 log.step("开始解析第%s页作品" % album_id)
 
                 # 获取相册
@@ -97,6 +99,8 @@ class CNU(robot.Robot):
                     album_path = os.path.join(self.image_download_path, str(album_id))
                 temp_path = album_path
                 for image_url in album_response["image_url_list"]:
+                    if not self.is_running():
+                        tool.process_exit(0)
                     log.step("作品%s 《%s》 开始下载第%s张图片 %s" % (album_id, album_title, image_index, image_url))
 
                     file_type = image_url.split(".")[-1]
@@ -124,7 +128,7 @@ class CNU(robot.Robot):
             log.error(str(e) + "\n" + str(traceback.format_exc()))
 
         # 重新保存存档文件
-        tool.write_file(str(album_id), self.save_data_path, tool.WRITE_FILE_TYPE_APPEND)
+        tool.write_file(str(album_id), self.save_data_path, tool.WRITE_FILE_TYPE_REPLACE)
         log.step("全部下载完毕，耗时%s秒，共计图片%s张" % (self.get_run_time(), total_image_count))
 
 
