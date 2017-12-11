@@ -104,13 +104,12 @@ def get_video_page(video_id):
     if not robot.check_sub_key(("args",), video_info_data):
         raise robot.RobotException("视频信息'args'字段不存在\n%s" % video_info_data)
     if not robot.check_sub_key(("url_encoded_fmt_stream_map",), video_info_data["args"]):
-        raise robot.RobotException("视频信息'args'字段不存在\n%s" % video_info_data["args"])
-    video_info_list = video_info_data["args"]["url_encoded_fmt_stream_map"].split(",")
+        raise robot.RobotException("视频信息'url_encoded_fmt_stream_map'字段不存在\n%s" % video_info_data["args"])
     max_video_resolution = 0
-    for video_param_info in video_info_list:
-        video_resolution = video_url = None
+    for sub_url_encoded_fmt_stream_map in video_info_data["args"]["url_encoded_fmt_stream_map"].split(","):
+        video_resolution = video_url = signature = None
         is_skip = False
-        for sub_param in video_param_info.split("&"):
+        for sub_param in sub_url_encoded_fmt_stream_map.split("&"):
             key, value = str(sub_param).split("=")
             if key == "type":  # 视频类型
                 video_type = urllib.unquote(value)
@@ -132,6 +131,10 @@ def get_video_page(video_id):
                     log.error("unknown video quality " + value)
             elif key == "url":
                 video_url = urllib.unquote(value)
+            elif key == "s":
+                signature = decrypt_signature(value)
+            elif key == "sig":
+                signature = value
         if is_skip:
             continue
         if video_url is None or video_url is None:
@@ -139,6 +142,8 @@ def get_video_page(video_id):
             continue
         if video_resolution > max_video_resolution:
             max_video_resolution = video_resolution
+            if signature is not None:
+                video_url += "&signature=" + str(signature)
             result["video_url"] = video_url
     if result["video_url"] is None:
         raise robot.RobotException("视频地址解析错误\n%s" % video_info_string)
@@ -168,6 +173,34 @@ def get_video_page(video_id):
     return result
 
 
+# 部分版权视频需要的signature字段取值
+# 解析自/yts/jsbin/player-vfl4OEYh9/en_US/base.js文件中
+# k.sig?f.set("signature",k.sig):k.s&&f.set("signature",SJ(k.s));
+# SJ=function(a){a=a.split("");RJ.yF(a,48);RJ.It(a,31);RJ.yF(a,24);RJ.It(a,74);return a.join("")};
+# var RJ={yF:function(a,b){var c=a[0];a[0]=a[b%a.length];a[b]=c},It:function(a){a.reverse()},yp:function(a,b){a.splice(0,b)}};
+def decrypt_signature(s):
+    a = list(s)
+    _calc1(a, 48)
+    _calc2(a, 31)
+    _calc1(a, 24)
+    _calc2(a, 74)
+    return "".join(a)
+
+
+def _calc1(a, b):
+    c = a[0]
+    a[0] = a[b % len(a)]
+    a[b] = c
+
+
+def _calc2(a, b):
+    a.reverse()
+
+
+def _calc3(a, b):
+    a.splice(0, b)
+
+
 class Youtube(robot.Robot):
     def __init__(self):
         global VIDEO_DOWNLOAD_PATH
@@ -191,7 +224,7 @@ class Youtube(robot.Robot):
 
         # 解析存档文件
         # account_id  video_count video_string_id  video_number_id
-        ACCOUNT_LIST = robot.read_save_data(self.save_data_path, 0, ["", "0", "", ""])
+        ACCOUNT_LIST = robot.read_save_data(self.save_data_path, 0, ["", "0", "", "0"])
 
         # 循环下载每个id
         main_thread_count = threading.activeCount()
@@ -234,7 +267,6 @@ class Download(robot.DownloadThread):
             self.account_name = self.account_info[4]
         else:
             self.account_name = self.account_info[0]
-        self.total_video_count = 0
         log.step(self.account_name + " 开始")
 
     # 获取所有可下载视频
@@ -290,10 +322,10 @@ class Download(robot.DownloadThread):
 
         # 如果解析需要下载的视频时没有找到上次的记录，表示存档所在的视频已被删除，则判断数字id
         if not self.is_find:
-            if video_response["video_id"] < int(self.account_info[3]):
+            if video_response["video_time"] < int(self.account_info[3]):
                 log.step(self.account_name + " 视频%s跳过" % video_id)
                 return
-            elif video_response["video_id"] == int(self.account_info[3]):
+            elif video_response["video_time"] == int(self.account_info[3]):
                 log.error(self.account_name + " 第%s个视频%s与存档视频发布日期一致，无法过滤，再次下载" % (video_index, video_id))
             else:
                 self.is_find = True
