@@ -175,14 +175,6 @@ def prpr():
     prpr.PrPr().main()
 
 
-# 篠田麻里子blog
-def shinoda_blog():
-    from shinoda import shinoda
-    shinoda_blog_path = os.path.join(ROOT_PATH, "shinoda")
-    os.chdir(shinoda_blog_path)
-    shinoda.Blog().main()
-
-
 # 图虫
 def tuchong():
     from tuchong import tuchong
@@ -261,14 +253,6 @@ def yizhibo():
     yizhibo.YiZhiBo().main()
 
 
-# 尤物看板
-def ywkb():
-    from ywkb import ywkb
-    ywkb_path = os.path.join(ROOT_PATH, "ywkb")
-    os.chdir(ywkb_path)
-    ywkb.YWKB().main()
-
-
 # ameblo()
 # bcy()
 # chang_ba()
@@ -289,7 +273,6 @@ def ywkb():
 # nogizaka46_blog()
 # nvshens()
 # prpr()
-# shinoda_blog()
 # tuchong()
 # tumblr()
 # twitter()
@@ -297,6 +280,5 @@ def ywkb():
 # weibo()
 # weibo_article()
 # yizhibo()
-# ywkb()
 # from common import tool
 # tool.shutdown()
