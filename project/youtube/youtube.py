@@ -137,8 +137,8 @@ def get_video_page(video_id):
             elif key == "s":
                 # 解析JS文件，获取对应的加密方法
                 if len(decrypt_function_step) == 0:
-                    js_file_name = tool.find_sub_string(video_play_response.data, 'src="/yts/jsbin/player-', '/en_US/base.js"')
-                    js_file_url = "https://www.youtube.com/yts/jsbin/player-%s/en_US/base.js" % js_file_name
+                    js_file_name = tool.find_sub_string(video_play_response.data, 'src="/yts/jsbin/player-', '/base.js"')
+                    js_file_url = "https://www.youtube.com/yts/jsbin/player-%s/base.js" % js_file_name
                     decrypt_function_step = get_decrypt_step(js_file_url)
                     log.trace("JS文件 %s 解析出的本地加密方法\n%s" % (js_file_url, decrypt_function_step))
                 # 生成加密字符串
@@ -202,7 +202,7 @@ def get_decrypt_step(js_file_url):
     if not main_function_name:
         raise robot.RobotException("播放器JS文件 %s，加密方法名截取失败" % js_file_url)
     # 加密方法体（包含子加密方法的调用参数&顺序）
-    # # SJ=function(a){a=a.split("");RJ.yF(a,48);RJ.It(a,31);RJ.yF(a,24);RJ.It(a,74);return a.join("")};
+    # SJ=function(a){a=a.split("");RJ.yF(a,48);RJ.It(a,31);RJ.yF(a,24);RJ.It(a,74);return a.join("")};
     main_function_body = tool.find_sub_string(js_file_response.data, '%s=function(a){a=a.split("");' % main_function_name, 'return a.join("")};')
     if not main_function_body:
         raise robot.RobotException("播放器JS文件 %s，加密方法体截取失败" % js_file_url)
@@ -213,7 +213,7 @@ def get_decrypt_step(js_file_url):
         if not sub_decrypt_step:
             continue
         # (加密方法所在变量名，加密方法名，加密方法参数)
-        sub_decrypt_step_find = re.findall("(\w*)\.(\w*)\(a,(\d*)\)", sub_decrypt_step)
+        sub_decrypt_step_find = re.findall("([\w\$\_]*)\.(\w*)\(a,(\d*)\)", sub_decrypt_step)
         if len(sub_decrypt_step_find) != 1:
             raise robot.RobotException("播放器JS文件 %s，加密步骤匹配失败\n%s" % (js_file_url, sub_decrypt_step))
         if decrypt_function_var is None:
@@ -224,6 +224,8 @@ def get_decrypt_step(js_file_url):
     # 子加密方法所在的变量内容
     # var RJ={yF:function(a,b){var c=a[0];a[0]=a[b%a.length];a[b]=c},It:function(a){a.reverse()},yp:function(a,b){a.splice(0,b)}};
     decrypt_function_var_body = tool.find_sub_string(js_file_response.data, "var %s={" % decrypt_function_var, "};")
+    if not main_function_body:
+        raise robot.RobotException("播放器JS文件 %s，加密子方法截取失败" % js_file_url)
     # 所有子加密方法具体内容
     decrypt_function_body_list = decrypt_function_var_body.split(",\n")
     if len(decrypt_function_body_list) != 3:
