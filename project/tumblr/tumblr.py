@@ -116,7 +116,7 @@ def get_one_page_private_blog(account_id, page_count):
     post_pagination_url = "https://www.tumblr.com/svc/indash_blog"
     query_data = {
         "limit": EACH_PAGE_COUNT,
-        "offset": page_count * EACH_PAGE_COUNT,
+        "offset": (page_count - 1) * EACH_PAGE_COUNT,
         "post_id": "",
         "should_bypass_safemode": "false",
         "should_bypass_tagfiltering": "false",
@@ -191,8 +191,6 @@ def get_one_page_private_blog(account_id, page_count):
         result["post_info_list"].append(result_post_info)
     if len(post_pagination_response.json_data["response"]["posts"]) < EACH_PAGE_COUNT:
         result["is_over"] = True
-    for i in result["post_info_list"]:
-        print i
     return result
 
 
@@ -449,7 +447,7 @@ class Download(robot.DownloadThread):
                 log.error(self.account_id + " 第%s页日志解析失败，原因：%s" % (page_count, e.message))
                 raise
 
-            if post_pagination_response["is_over"]:
+            if not self.is_private and post_pagination_response["is_over"]:
                 break
 
             log.trace(self.account_id + " 第%s页解析的全部日志：%s" % (page_count, post_pagination_response["post_info_list"]))
@@ -476,7 +474,10 @@ class Download(robot.DownloadThread):
                     break
 
             if not is_over:
-                page_count += 1
+                if post_pagination_response["is_over"]:
+                    is_over = True
+                else:
+                    page_count += 1
         return post_info_list
 
     # 解析单个日志
