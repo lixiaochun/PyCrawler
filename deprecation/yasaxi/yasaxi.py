@@ -121,7 +121,10 @@ class Yasaxi(robot.Robot):
         # 服务器有请求数量限制，所以取消多线程
         self.thread_count = 1
 
-    def main(self):
+        # 解析存档文件
+        # account_id  status_id
+        self.account_list = robot.read_save_data(self.save_data_path, 0, ["", ""])
+
         # 从文件中宏读取账号信息（访问token）
         if not yasaxiCommon.get_token_from_file():
             while True:
@@ -132,11 +135,7 @@ class Yasaxi(robot.Robot):
                 elif input_str in ["n", "no"]:
                     return
 
-
-        # 解析存档文件
-        # account_id  status_id
-        self.account_list = robot.read_save_data(self.save_data_path, 0, ["", ""])
-
+    def main(self):
         # 循环下载每个id
         main_thread_count = threading.activeCount()
         for account_id in sorted(self.account_list.keys()):

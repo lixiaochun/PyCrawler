@@ -143,7 +143,11 @@ class Article(robot.Robot):
         # 设置全局变量，供子线程调用
         COOKIE_INFO.update(self.cookie_value)
 
-    def main(self):
+         # 解析存档文件
+        # account_id  last_article_time  (account_name)
+        self.account_list = robot.read_save_data(self.save_data_path, 0, ["", "0"])
+
+        # 检测登录状态
         if not weiboCommon.check_login(COOKIE_INFO):
             # 如果没有获得登录相关的cookie，则模拟登录并更新cookie
             new_cookies_list = weiboCommon.generate_login_cookie(COOKIE_INFO)
@@ -160,10 +164,7 @@ class Article(robot.Robot):
                     elif input_str in ["n", "no"]:
                         tool.process_exit()
 
-        # 解析存档文件
-        # account_id  last_article_time  (account_name)
-        self.account_list = robot.read_save_data(self.save_data_path, 0, ["", "0"])
-
+    def main(self):
         # 循环下载每个id
         main_thread_count = threading.activeCount()
         for account_id in sorted(self.account_list.keys()):
