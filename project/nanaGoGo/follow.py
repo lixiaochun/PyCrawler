@@ -8,12 +8,11 @@ email: hikaru870806@hotmail.com
 """
 from common import *
 import os
-import sys
 import time
 
 COOKIE_INFO = {}
 # 存放解析出的账号文件路径
-ACCOUNT_ID_FILE_PATH = os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), "info/account.data")
+ACCOUNT_ID_FILE_PATH = os.path.join(os.path.dirname(__file__), "info/account.data")
 
 
 # 获取账号存档文件
@@ -35,21 +34,21 @@ def follow_account(account_id):
     }
     follow_response = net.http_request(follow_api_url, method="POST", fields=post_data, header_list=header_list, cookies_list=COOKIE_INFO, json_decode=True)
     if follow_response.status == net.HTTP_RETURN_CODE_SUCCEED:
-        if robot.check_sub_key(("data", "error"), follow_response.json_data) and follow_response.json_data["data"] is None:
+        if crawler.check_sub_key(("data", "error"), follow_response.json_data) and follow_response.json_data["data"] is None:
             output.print_msg("关注%s成功" % account_id)
             return True
         else:
             output.print_msg("关注%s失败，请求返回：%s，退出程序！" % (account_id, follow_response.json_data))
             tool.process_exit()
     else:
-        output.print_msg("关注%s失败，请求返回结果：%s，退出程序！" % (account_id, robot.get_http_request_failed_reason(follow_response.status)))
+        output.print_msg("关注%s失败，请求返回结果：%s，退出程序！" % (account_id, crawler.get_http_request_failed_reason(follow_response.status)))
         tool.process_exit()
     return False
 
 
 def main():
     # 获取cookies
-    all_cookie_from_browser = robot.quicky_get_all_cookies_from_browser()
+    all_cookie_from_browser = crawler.quickly_get_all_cookies_from_browser()
     if "api.7gogo.jp" in all_cookie_from_browser and ".7gogo.jp" in all_cookie_from_browser:
         for cookie_key in all_cookie_from_browser["api.7gogo.jp"]:
             COOKIE_INFO[cookie_key] = all_cookie_from_browser["api.7gogo.jp"][cookie_key]

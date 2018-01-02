@@ -6,16 +6,15 @@ email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
 from common import *
-from pyquery import PyQuery as pq
+from pyquery import PyQuery as PQ
 import json
 import os
 import re
-import sys
 
 
 # 从文件中读取account id
 def get_account_id_from_file():
-    return tool.read_file(os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), "account.data"))
+    return tool.read_file(os.path.join(os.path.dirname(__file__), "account.data"))
 
 
 # 获取指定账号的全部游戏ud列表
@@ -23,18 +22,18 @@ def get_account_owned_app_list(user_id):
     game_index_url = "http://steamcommunity.com/profiles/%s/games/?tab=all" % user_id
     game_index_response = net.http_request(game_index_url, method="GET")
     if game_index_response.status != net.HTTP_RETURN_CODE_SUCCEED:
-        raise robot.RobotException(robot.get_http_request_failed_reason(game_index_response.status))
+        raise crawler.CrawlerException(crawler.get_http_request_failed_reason(game_index_response.status))
     owned_all_game_data = tool.find_sub_string(game_index_response.data, "var rgGames = ", ";")
     if not owned_all_game_data:
-        raise robot.RobotException("页面截取游戏列表失败\n%s" % game_index_response.data)
+        raise crawler.CrawlerException("页面截取游戏列表失败\n%s" % game_index_response.data)
     try:
         owned_all_game_data = json.loads(owned_all_game_data)
     except ValueError:
-        raise robot.RobotException("游戏列表加载失败\n%s" % owned_all_game_data)
+        raise crawler.CrawlerException("游戏列表加载失败\n%s" % owned_all_game_data)
     app_id_list = []
     for game_data in owned_all_game_data:
-        if not "appid" in game_data:
-            raise robot.RobotException("游戏信息'appid'字段不存在\n%s" % game_data)
+        if "appid" not in game_data:
+            raise crawler.CrawlerException("游戏信息'appid'字段不存在\n%s" % game_data)
         app_id_list.append(str(game_data["appid"]))
     return app_id_list
 
@@ -50,8 +49,8 @@ def get_discount_game_list(login_cookie):
         cookies_list = {"steamLogin": login_cookie}
         discount_game_pagination_response = net.http_request(discount_game_pagination_url, method="GET", cookies_list=cookies_list)
         if discount_game_pagination_response.status != net.HTTP_RETURN_CODE_SUCCEED:
-            raise robot.RobotException("第%s页打折游戏解析失败" % page_count)
-        search_result_selector = pq(discount_game_pagination_response.data).find("#search_result_container")
+            raise crawler.CrawlerException("第%s页打折游戏解析失败" % page_count)
+        search_result_selector = PQ(discount_game_pagination_response.data).find("#search_result_container")
         game_list_selector = search_result_selector.find("div").eq(1).find("a")
         for game_index in range(0, game_list_selector.size()):
             game_selector = game_list_selector.eq(game_index)
@@ -93,15 +92,15 @@ def get_discount_game_list(login_cookie):
             # now price
             now_price = filter(str.isdigit, game_selector.find(".search_price").remove("span").text().encode("UTF-8"))
             # 如果没有取到，给个默认值
-            if not robot.is_integer(old_price):
+            if not crawler.is_integer(old_price):
                 old_price = 0
             else:
                 old_price = int(old_price)
-            if not robot.is_integer(now_price):
+            if not crawler.is_integer(now_price):
                 now_price = 0
             else:
                 now_price = int(now_price)
-            if not robot.is_integer(discount):
+            if not crawler.is_integer(discount):
                 if old_price == 0:
                     discount = 100
                 else:
@@ -121,7 +120,7 @@ def get_discount_game_list(login_cookie):
             else:
                 break
         else:
-            raise robot.RobotException("分页信息没有找到\n%s" % discount_game_pagination_response.data)
+            raise crawler.CrawlerException("分页信息没有找到\n%s" % discount_game_pagination_response.data)
     return discount_game_list
 
 
@@ -132,10 +131,10 @@ def get_self_account_badges(account_id, login_cookie):
     cookies_list = {"steamLogin": login_cookie}
     badges_index_response = net.http_request(badges_index_url, method="GET", cookies_list=cookies_list)
     if badges_index_response.status != net.HTTP_RETURN_CODE_SUCCEED:
-        raise robot.RobotException(robot.get_http_request_failed_reason(badges_index_response.status))
+        raise crawler.CrawlerException(crawler.get_http_request_failed_reason(badges_index_response.status))
     badges_detail_url_list = []
     # 徽章div
-    badges_selector = pq(badges_index_response.data).find(".maincontent .badges_sheet .badge_row")
+    badges_selector = PQ(badges_index_response.data).find(".maincontent .badges_sheet .badge_row")
     for index in range(0, badges_selector.size()):
         badge_html = badges_selector.eq(index).html().encode("UTF-8")
         # 已经掉落全部卡牌的徽章
@@ -143,7 +142,7 @@ def get_self_account_badges(account_id, login_cookie):
             # 徽章详细信息页面地址
             badge_detail_url = tool.find_sub_string(badge_html, '<a class="badge_row_overlay" href="', '"/>')
             if not badge_detail_url:
-                raise robot.RobotException("徽章信息截取徽章详细界面地址失败\n%s" % badge_html)
+                raise crawler.CrawlerException("徽章信息截取徽章详细界面地址失败\n%s" % badge_html)
             badges_detail_url_list.append(badge_detail_url)
     # ['http://steamcommunity.com/profiles/76561198172925593/gamecards/459820/', 'http://steamcommunity.com/profiles/76561198172925593/gamecards/357200/', 'http://steamcommunity.com/profiles/76561198172925593/gamecards/502740/', 'http://steamcommunity.com/profiles/76561198172925593/gamecards/359600/', 'http://steamcommunity.com/profiles/76561198172925593/gamecards/354380/', 'http://steamcommunity.com/profiles/76561198172925593/gamecards/359670/', 'http://steamcommunity.com/profiles/76561198172925593/gamecards/525300/', 'http://steamcommunity.com/profiles/76561198172925593/gamecards/337980/', 'http://steamcommunity.com/profiles/76561198172925593/gamecards/591420/']
     return badges_detail_url_list
@@ -157,22 +156,22 @@ def get_self_account_badge_card(badge_detail_url, login_cookie):
     }
     badge_detail_response = net.http_request(badge_detail_url, method="GET", cookies_list=cookies_list)
     if badge_detail_response.status != net.HTTP_RETURN_CODE_SUCCEED:
-        raise robot.RobotException(robot.get_http_request_failed_reason(badge_detail_response.status))
+        raise crawler.CrawlerException(crawler.get_http_request_failed_reason(badge_detail_response.status))
     wanted_card_list = {}
-    page_selector = pq(badge_detail_response.data)
+    page_selector = PQ(badge_detail_response.data)
     # 徽章等级
     badge_selector = page_selector.find(".maincontent .badge_current .badge_info")
     # 有等级
     if badge_selector.find(".badge_info_description").size() == 1:
         badge_level_html = badge_selector.find(".badge_info_description div").eq(1).text()
         if not badge_level_html:
-            raise robot.RobotException("页面截取徽章等级信息失败\n%s" % badge_detail_response.data)
+            raise crawler.CrawlerException("页面截取徽章等级信息失败\n%s" % badge_detail_response.data)
         badge_level_html = badge_level_html.encode("UTF-8")
         badge_level_find = re.findall("(\d) 级, [\d]00 点经验值", badge_level_html)
         if len(badge_level_find) != 1:
-            raise robot.RobotException("徽章等级信息徽章等级失败\n%s" % badge_level_html)
-        if not robot.is_integer(badge_level_find[0]):
-            raise robot.RobotException("徽章等级类型不正确\n%s" % badge_level_html)
+            raise crawler.CrawlerException("徽章等级信息徽章等级失败\n%s" % badge_level_html)
+        if not crawler.is_integer(badge_level_find[0]):
+            raise crawler.CrawlerException("徽章等级类型不正确\n%s" % badge_level_html)
         badge_level = int(badge_level_find[0])
     else:
         badge_level = 0
@@ -200,13 +199,13 @@ def get_market_game_trade_card_price(game_id, login_cookie):
     market_search_url += "?query=&count=20&appid=753&category_753_Game[0]=tag_app_%s&category_753_cardborder[0]=tag_cardborder_0" % game_id
     market_search_response = net.http_request(market_search_url, method="GET", cookies_list=cookies_list, json_decode=True)
     if market_search_response.status != net.HTTP_RETURN_CODE_SUCCEED:
-        raise robot.RobotException(robot.get_http_request_failed_reason(market_search_response.status))
+        raise crawler.CrawlerException(crawler.get_http_request_failed_reason(market_search_response.status))
     market_item_list = {}
-    if not robot.check_sub_key(("success", "results_html"), market_search_response.json_data):
-        raise robot.RobotException("返回信息'success'或'results_html'字段不存在\n%s" % market_search_response.json_data)
+    if not crawler.check_sub_key(("success", "results_html"), market_search_response.json_data):
+        raise crawler.CrawlerException("返回信息'success'或'results_html'字段不存在\n%s" % market_search_response.json_data)
     if market_search_response.json_data["success"] is not True:
-        raise robot.RobotException("返回信息'success'字段取值不正确\n%s" % market_search_response.json_data)
-    card_selector = pq(market_search_response.json_data["results_html"]).find(".market_listing_row_link")
+        raise crawler.CrawlerException("返回信息'success'字段取值不正确\n%s" % market_search_response.json_data)
+    card_selector = PQ(market_search_response.json_data["results_html"]).find(".market_listing_row_link")
     for index in range(0, card_selector.size()):
         card_name = card_selector.eq(index).find(".market_listing_item_name").text()
         card_min_price = card_selector.eq(index).find("span.normal_price span.normal_price").text().encode("UTF-8").replace("¥ ", "")
@@ -218,9 +217,9 @@ def get_market_game_trade_card_price(game_id, login_cookie):
 # 从浏览器中获取登录cookies
 def get_login_cookie_from_browser():
     # 获取cookies
-    all_cookie_from_browser = robot.quicky_get_all_cookies_from_browser()
+    all_cookie_from_browser = crawler.quickly_get_all_cookies_from_browser()
     if "store.steampowered.com" not in all_cookie_from_browser:
-        raise robot.RobotException("浏览器解析cookies失败\n%s" % all_cookie_from_browser)
+        raise crawler.CrawlerException("浏览器解析cookies失败\n%s" % all_cookie_from_browser)
     if "steamLogin" in all_cookie_from_browser["store.steampowered.com"]:
         return all_cookie_from_browser["store.steampowered.com"]["steamLogin"]
     login_url = "https://store.steampowered.com/login/checkstoredlogin/?redirectURL="
@@ -228,7 +227,7 @@ def get_login_cookie_from_browser():
     if login_response.status == 302:
         set_cookies = net.get_cookies_from_response_header(login_response.headers)
         if "steamLogin" not in set_cookies:
-            raise robot.RobotException("登录返回cookies不正确，\n%s" % set_cookies)
+            raise crawler.CrawlerException("登录返回cookies不正确，\n%s" % set_cookies)
         return set_cookies["steamLogin"]
     else:
-        raise robot.RobotException("登录返回code不正确，\n%s\n%s" % (login_response.status, login_response.data))
+        raise crawler.CrawlerException("登录返回code不正确，\n%s\n%s" % (login_response.status, login_response.data))

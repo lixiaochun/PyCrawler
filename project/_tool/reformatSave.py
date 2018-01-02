@@ -2,12 +2,11 @@
 # 重新格式化存档，修改字段顺序
 from common import tool
 import os
-import sys
 
 # 旧存档路径
-OLD_SAVE_FILE_PATH = os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), "save.data")
+OLD_SAVE_FILE_PATH = os.path.join(os.path.dirname(__file__), "save.data")
 # 新存档路径
-NEW_SAVE_FILE_PATH = os.path.join(os.path.dirname(sys._getframe().f_code.co_filename), "new_save.data")
+NEW_SAVE_FILE_PATH = os.path.join(os.path.dirname(__file__), "new_save.data")
 
 
 # 修改存档文件列的顺序并保存

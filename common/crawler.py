@@ -5,8 +5,7 @@
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
 """
-from common import *
-from common import process
+from common import browser, path, tool
 import codecs
 import ConfigParser
 import os
@@ -38,7 +37,7 @@ CONFIG_ANALYSIS_MODE_BOOLEAN = 2
 CONFIG_ANALYSIS_MODE_PATH = 3
 
 
-class Robot(object):
+class Crawler(object):
     total_image_count = 0
     total_video_count = 0
     print_function = None
@@ -293,7 +292,7 @@ class DownloadThread(threading.Thread):
         """
         threading.Thread.__init__(self)
         self.account_info = account_info
-        if isinstance(main_thread, Robot):
+        if isinstance(main_thread, Crawler):
             self.main_thread = main_thread
             self.thread_lock = main_thread.thread_lock
         else:
@@ -318,14 +317,14 @@ class DownloadThread(threading.Thread):
             path.delete_dir_or_file(temp_path)
 
 
-class RobotException(SystemExit):
+class CrawlerException(SystemExit):
     def __init__(self, msg=""):
         SystemExit.__init__(self, 1)
         self.exception_message = msg
 
     @property
     def message(self):
-        return  self.exception_message
+        return self.exception_message
 
 
 def read_config(config_path):
@@ -529,7 +528,7 @@ def get_http_request_failed_reason(return_code):
 # 读取配置文件，快速设置代理
 # is_auto = False   始终使用代理
 #           True    配置文件未禁止时使用代理（IS_PROXY = 1 or 2)
-def quicky_set_proxy(config=None, is_auto=True):
+def quickly_set_proxy(config=None, is_auto=True):
     if not isinstance(config, ConfigParser.SafeConfigParser):
         config = read_config(tool.PROJECT_CONFIG_PATH)
     # 设置代理
@@ -544,20 +543,21 @@ def quicky_set_proxy(config=None, is_auto=True):
 
 
 # 读取配置文件，返回存档文件所在路径
-def quicky_get_save_data_path(config=None):
+def quickly_get_save_data_path(config=None):
     if not isinstance(config, ConfigParser.SafeConfigParser):
         config = read_config(tool.PROJECT_CONFIG_PATH)
     return analysis_config(config, "SAVE_DATA_PATH", "\\\\info/save.data", CONFIG_ANALYSIS_MODE_PATH)
 
-def quicky_get_all_cookies_from_browser(config=None):
+
+# 读取浏览器cookies
+def quickly_get_all_cookies_from_browser(config=None):
     if not isinstance(config, ConfigParser.SafeConfigParser):
         config = read_config(tool.PROJECT_CONFIG_PATH)
     # 是否自动查找cookies路径
     is_auto_get_cookie = analysis_config(config, "IS_AUTO_GET_COOKIE", True, CONFIG_ANALYSIS_MODE_BOOLEAN)
-    if is_auto_get_cookie:
-        # 操作系统&浏览器
-        browser_type = analysis_config(config, "BROWSER_TYPE", 2, CONFIG_ANALYSIS_MODE_INTEGER)
-        cookie_path = browser.get_default_browser_cookie_path(browser_type)
-    else:
-        cookie_path = analysis_config(config, "COOKIE_PATH", "")
+    if not is_auto_get_cookie:
+        return {}
+    # 操作系统&浏览器
+    browser_type = analysis_config(config, "BROWSER_TYPE", browser.BROWSER_TYPE_CHROME, CONFIG_ANALYSIS_MODE_INTEGER)
+    cookie_path = browser.get_default_browser_cookie_path(browser_type)
     return browser.get_all_cookie_from_browser(browser_type, cookie_path)
