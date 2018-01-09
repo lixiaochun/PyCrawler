@@ -22,6 +22,17 @@ USER_AGENT = None
 IS_STEP_ERROR_403_AND_404 = False
 
 
+# 检测登录状态
+def check_login():
+    if not COOKIE_INFO:
+        return False
+    index_url = "https://www.tumblr.com/"
+    index_response = net.http_request(index_url, method="GET", cookies_list=COOKIE_INFO, is_auto_redirect=False)
+    if index_response.status == 302 and index_response.getheader("Location") == "https://www.tumblr.com/dashboard":
+        return True
+    return False
+
+
 # 获取首页，判断是否支持https以及是否启用safe-mode和"Show this blog on the web"
 def get_index_setting(account_id):
     index_url = "https://%s.tumblr.com/" % account_id
@@ -237,7 +248,7 @@ def get_post_page(post_url, is_safe_mode):
         new_image_url_list = {}
         for image_url in image_url_list:
             # 头像，跳过
-            if image_url.find("/avatar_") != -1 or image_url[-9:] == "_75sq.gif" or image_url[-9:] == "_75sq.jpg":
+            if image_url.find("/avatar_") != -1 or image_url[-9:] == "_75sq.gif" or image_url[-9:] == "_75sq.jpg" or image_url.find("/birthday1_") != -1:
                 continue
             image_id, resolution = analysis_image(image_url)
             # 判断是否有分辨率更小的相同图片
@@ -368,6 +379,18 @@ class Tumblr(crawler.Crawler):
         # 解析存档文件
         # account_id  last_post_id
         self.account_list = crawler.read_save_data(self.save_data_path, 0, ["", "0"])
+
+        # 检测登录状态
+        if not check_login():
+            while True:
+                input_str = output.console_input(crawler.get_time() + " 没有检测到账号登录状态，可能无法解析开启safe mode的账号，继续程序(C)ontinue？或者退出程序(E)xit？:")
+                input_str = input_str.lower()
+                if input_str in ["e", "exit"]:
+                    tool.process_exit()
+                elif input_str in ["c", "continue"]:
+                    global IS_LOGIN
+                    IS_LOGIN = False
+                    break
 
     def main(self):
         # 循环下载每个id
