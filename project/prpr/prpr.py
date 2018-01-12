@@ -12,6 +12,7 @@ import time
 import traceback
 
 POST_COUNT_PER_PAGE = 10  # 每次获取的作品数量（貌似无效）
+IS_SKIP_BLUR = False
 IS_STEP_INVALID_RESOURCE = False
 
 
@@ -99,28 +100,33 @@ def get_post_page(post_id):
 # 检测下载得文件是否有效
 def check_invalid(file_path):
     if file_path.split(".")[-1] == "png" and os.path.getsize(file_path) < 102400:
-        if tool.get_file_md5(file_path) in ["76d8988358e84e123a126d736be4bc44", "0d527d84f1150d002998cb67ec271de5", "2423c99718385d789cec3e6c1c1020db",
-                                            "0764beb3d521b9b420d365f6ee6d453b", "1ba2863db2ac7296d73818be890ef378", "7a9abea08bc47d3a64f87eebdd533dcd",
-                                            "23e0a284d4fa44c222bf41d3cb58b241", "483ec66794f1dfa02d634c4745fd4ded", "dd77da050fc0bcf79d22d35deb1019bd"]:
+        if tool.get_file_md5(file_path) in ["0764beb3d521b9b420d365f6ee6d453b", "0d527d84f1150d002998cb67ec271de5", "11f81047704ca9a522f54ced9ef82a85",
+                                            "1ba2863db2ac7296d73818be890ef378", "23e0a284d4fa44c222bf41d3cb58b241", "2423c99718385d789cec3e6c1c1020db",
+                                            "483ec66794f1dfa02d634c4745fd4ded", "6a9e28c562a9187ad262f027b0ed9cf2", "76d8988358e84e123a126d736be4bc44",
+                                            "7a9abea08bc47d3a64f87eebdd533dcd", "7c6b17080d95d2e7847f6c00b1228182", "c0de7824049435be9209b8f39fbcb1ba",
+                                            "cbccd65c36ff32fe877bf56b7e70a8ba", "dd77da050fc0bcf79d22d35deb1019bd", "f932db2213fee316359b1267f972899e",
+                                            ]:
             return True
     return False
 
 
 class PrPr(crawler.Crawler):
     def __init__(self):
-        global IS_STEP_INVALID_RESOURCE
+        global IS_SKIP_BLUR, IS_STEP_INVALID_RESOURCE
 
         sys_config = {
             crawler.SYS_DOWNLOAD_IMAGE: True,
             crawler.SYS_DOWNLOAD_VIDEO: True,
             crawler.SYS_APP_CONFIG: (
                 os.path.realpath("config.ini"),
-                ("IS_STEP_INVALID_RESOURCE", False, crawler.CONFIG_ANALYSIS_MODE_BOOLEAN)
+                ("IS_STEP_INVALID_RESOURCE", False, crawler.CONFIG_ANALYSIS_MODE_BOOLEAN),
+                ("IS_SKIP_BLUR", False, crawler.CONFIG_ANALYSIS_MODE_BOOLEAN),
             ),
         }
         crawler.Crawler.__init__(self, sys_config)
 
         # 设置全局变量，供子线程调用
+        IS_SKIP_BLUR = self.app_config["IS_SKIP_BLUR"]
         IS_STEP_INVALID_RESOURCE = self.app_config["IS_STEP_INVALID_RESOURCE"]
 
         # 解析存档文件
@@ -225,14 +231,18 @@ class Download(crawler.DownloadThread):
                 origin_image_url, file_param = image_url.split("?", 1)
                 file_name_and_type = origin_image_url.split("/")[-1]
                 if file_param.find("/blur/") >= 0:
+                    # 跳过
+                    if IS_SKIP_BLUR:
+                        log.step(self.account_name + " 作品%s 第%s张图片 %s 跳过" % (post_info["post_id"], image_index, image_url))
+                        continue
                     image_file_path = os.path.join(self.main_thread.image_download_path, self.account_name, "blur", file_name_and_type)
                 else:
-                    image_file_path = os.path.join(self.main_thread.image_download_path, self.account_name, "other", file_name_and_type)
+                    image_file_path = os.path.join(self.main_thread.image_download_path, self.account_name, file_name_and_type)
                 save_file_return = net.save_net_file(image_url, image_file_path, need_content_type=True)
                 if save_file_return["status"] == 1:
                     if check_invalid(save_file_return["file_path"]):
                         path.delete_dir_or_file(save_file_return["file_path"])
-                        error_message = self.account_name + " 作品%s 第%s张图 %s 无效，已删除" % (post_info["post_id"], image_index, image_url)
+                        error_message = self.account_name + " 作品%s 第%s张图片 %s 无效，已删除" % (post_info["post_id"], image_index, image_url)
                         if IS_STEP_INVALID_RESOURCE:
                             log.step(error_message)
                         else:
