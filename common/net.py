@@ -216,12 +216,13 @@ def http_request(url, method="GET", fields=None, binary_data=None, header_list=N
                 continue
             return response
         except urllib3.exceptions.ProxyError:
-            notice = "无法访问代理服务器，请检查代理设置。检查完成后输入(C)ontinue继续程序或者(S)top退出程序："
-            input_str = output.console_input(notice).lower()
-            if input_str in ["c", "continue"]:
-                pass
-            elif input_str in ["s", "stop"]:
-                tool.process_exit(0)
+            time.sleep(2)
+            # notice = "无法访问代理服务器，请检查代理设置。检查完成后输入(C)ontinue继续程序或者(S)top退出程序："
+            # input_str = output.console_input(notice).lower()
+            # if input_str in ["c", "continue"]:
+            #     pass
+            # elif input_str in ["s", "stop"]:
+            #     tool.process_exit(0)
         except urllib3.exceptions.ReadTimeoutError:
             pass
         except urllib3.exceptions.ConnectTimeoutError, e:
@@ -263,7 +264,8 @@ def _random_user_agent():
         "Windows 8.1": "Windows NT 6.3",
         "Windows 10": "Windows NT 10.0",
     }
-    browser_type = random.choice([browser.BROWSER_TYPE_IE, browser.BROWSER_TYPE_FIREFOX, browser.BROWSER_TYPE_CHROME])
+    # browser_type = random.choice([browser.BROWSER_TYPE_IE, browser.BROWSER_TYPE_FIREFOX, browser.BROWSER_TYPE_CHROME])
+    browser_type = random.choice([browser.BROWSER_TYPE_FIREFOX, browser.BROWSER_TYPE_CHROME])
     os_type = random.choice(windows_version_dict.values())
     if browser_type == browser.BROWSER_TYPE_IE:
         sub_version = random.randint(6, 10)
@@ -325,7 +327,11 @@ def save_net_file(file_url, file_path, need_content_type=False, header_list=None
             if need_content_type:
                 content_type = response.getheader("Content-Type")
                 if content_type is not None and content_type != "octet-stream":
-                    file_path = os.path.splitext(file_path)[0] + "." + content_type.split("/")[-1]
+                    if content_type == "video/quicktime":
+                        new_file_type = "mov"
+                    else:
+                        new_file_type = content_type.split("/")[-1]
+                    file_path = os.path.splitext(file_path)[0] + "." + new_file_type
 
             # 获取完整数据
             response = http_request(file_url, method="GET", header_list=header_list, cookies_list=cookies_list,
@@ -343,7 +349,7 @@ def save_net_file(file_url, file_path, need_content_type=False, header_list=None
             if int(content_length) == file_size:
                 return {"status": 1, "code": 0, "file_path": file_path}
             else:
-                output.print_msg("本地文件%s：%s和网络文件%s：%s不一致" % (str(file_path), content_length, str(file_url), file_size))
+                output.print_msg("本地文件%s：%s和网络文件%s：%s不一致" % (file_path.encode("UTF-8"), content_length, str(file_url), file_size))
         elif response.status == HTTP_RETURN_CODE_URL_INVALID:
             if create_file:
                 path.delete_dir_or_file(file_path)
