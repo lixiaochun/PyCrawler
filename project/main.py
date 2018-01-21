@@ -216,7 +216,15 @@ def ugirls():
     ugirls.UGirls().main()
 
 
-# # 微博
+# V聊
+def vLiao():
+    from vliao import vLiao
+    vliao_path = os.path.join(ROOT_PATH, "vliao")
+    os.chdir(vliao_path)
+    vLiao.VLiao().main()
+
+
+# 微博
 def weibo():
     from weibo import weibo
     weibo_path = os.path.join(ROOT_PATH, "weibo")
@@ -277,6 +285,7 @@ def yizhibo():
 # tumblr()
 # twitter()
 # ugirls()
+# vLiao()
 # weibo()
 # weibo_article()
 # yizhibo()
