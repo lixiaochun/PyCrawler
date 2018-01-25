@@ -68,6 +68,9 @@ def get_blog_page(account_name, blog_id):
     }
     if blog_response.status != net.HTTP_RETURN_CODE_SUCCEED:
         raise crawler.CrawlerException(crawler.request_failre(blog_response.status))
+    # todo 登录cookies
+    if blog_response.data.find('<h1 data-uranus-component="amemberLoginHeading">この記事はアメンバーさん限定です。</h1>') >= 0:
+        raise crawler.CrawlerException("日志只限会员访问")
     # 截取日志正文部分（有多种页面模板）
     article_data = tool.find_sub_string(blog_response.data, '<div class="subContentsInner">', "<!--entryBottom-->", 1)
     if not article_data:
@@ -91,7 +94,7 @@ def filter_image_url(image_url):
             or image_url.find("//b.st-hatena.com/images/entry-button/") >= 0 or image_url.find("//vc.ameba.jp/view?") >= 0 \
             or image_url.find("//mail.google.com/mail/") >= 0 or image_url.find("//www.youtube.com/") >= 0 \
             or image_url.find("//jp.mg2.mail.yahoo.co.jp/ya/download/") >= 0 or image_url.find("//blog.watanabepro.co.jp/") >= 0 \
-            or image_url.find("//iine.blog.ameba.jp/web/display_iine.html") >= 0 \
+            or image_url.find("//iine.blog.ameba.jp/web/display_iine.html") >= 0 or image_url.find("//ameblo.jp/s/embed/reblog-card/") >= 0 \
             or image_url[-9:] == "clear.gif":
         return True
     return False
