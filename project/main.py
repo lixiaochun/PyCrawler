@@ -79,6 +79,14 @@ def jigadori():
     jigadori.Jigadori().main()
 
 
+# 克拉女神壁纸
+def kelagirls_wallpaper():
+    from kelagirls import wallpaper
+    kelagirls_wallpaper_path = os.path.join(ROOT_PATH, "kelagirls")
+    os.chdir(kelagirls_wallpaper_path)
+    wallpaper.Wallpaper().main()
+
+
 # 欅坂46公式Blog
 def keyakizaka46_diary():
     from keyakizaka46 import diary
@@ -269,6 +277,7 @@ def yizhibo():
 # google_plus()
 # instagram()
 # jigadori()
+# kelagirls_wallpaper
 # keyakizaka46_diary()
 # kg()
 # lofter()
