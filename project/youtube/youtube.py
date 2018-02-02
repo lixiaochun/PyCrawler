@@ -15,7 +15,21 @@ import time
 import traceback
 import urllib
 
+IS_LOGIN = True
 COOKIE_INFO = {}
+
+
+# 检测登录状态
+def check_login():
+    if not COOKIE_INFO:
+        return False
+    account_index_url = "https://www.youtube.com/account"
+    index_response = net.http_request(account_index_url, method="GET", cookies_list=COOKIE_INFO, is_auto_redirect=False)
+    if index_response.status == 303 and index_response.getheader("Location").find("https://accounts.google.com/ServiceLogin?") == 0:
+        return False
+    elif index_response.status == net.HTTP_RETURN_CODE_SUCCEED:
+        return True
+    return False
 
 
 # 获取用户首页
@@ -31,7 +45,7 @@ def get_one_page_video(account_id, token):
             index_url = "https://www.youtube.com/channel/%s/videos" % account_id
         else:
             index_url = "https://www.youtube.com/user/%s/videos" % account_id
-        index_response = net.http_request(index_url, method="GET")
+        index_response = net.http_request(index_url, method="GET", header_list={"accept-language": "en"})
         if index_response.status != net.HTTP_RETURN_CODE_SUCCEED:
             raise crawler.CrawlerException(crawler.request_failre(index_response.status))
         if index_response.data.find('<button id="a11y-skip-nav" class="skip-nav"') >= 0:
@@ -53,6 +67,7 @@ def get_one_page_video(account_id, token):
         query_url = "https://www.youtube.com/browse_ajax"
         query_data = {"ctoken": token}
         header_list = {
+            "accept-language": "en",
             "x-youtube-client-name": "1",
             "x-youtube-client-version": "2.20171207",
         }
@@ -86,14 +101,27 @@ def get_video_page(video_id):
     query_data = {"v": video_id}
     # 强制使用英语
 
-    video_play_response = net.http_request(video_play_url, method="GET", fields=query_data, cookies_list=COOKIE_INFO)
+    if IS_LOGIN:
+        video_play_response = net.http_request(video_play_url, method="GET", fields=query_data, cookies_list=COOKIE_INFO)
+    else:
+        # 没有登录时默认使用英语
+        video_play_response = net.http_request(video_play_url, method="GET", fields=query_data, header_list={"accept-language": "en"})
     result = {
+        "title": "",  # 视频标题
         "video_time": None,  # 视频上传时间
         "video_url": None,  # 视频地址
     }
     # 获取视频地址
     if video_play_response.status != net.HTTP_RETURN_CODE_SUCCEED:
         raise crawler.CrawlerException(crawler.request_failre(video_play_response.status))
+    # 没有登录，判断是否必须要登录
+    if not IS_LOGIN:
+        need_login_reason = tool.find_sub_string(video_play_response.data, '"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"', '",')
+        if need_login_reason:
+            if need_login_reason == "Sign in to confirm your age":
+                raise crawler.CrawlerException("视频需要登录账号并且年龄通过检测后才能访问")
+            else:
+                raise crawler.CrawlerException("视频需要登录账号才能访问，原因：%s" % need_login_reason)
     video_info_string = tool.find_sub_string(video_play_response.data, "ytplayer.config = ", ";ytplayer.load = ").strip()
     if not video_info_string:
         raise crawler.CrawlerException("页面截取视频信息失败\n%s" % video_play_response.data)
@@ -103,6 +131,11 @@ def get_video_page(video_id):
         raise crawler.CrawlerException("视频信息格式不正确\n%s" % video_info_string)
     if not crawler.check_sub_key(("args",), video_info_data):
         raise crawler.CrawlerException("视频信息'args'字段不存在\n%s" % video_info_data)
+    # 获取视频标题
+    if not crawler.check_sub_key(("title",), video_info_data["args"]):
+        raise crawler.CrawlerException("视频信息'title'字段不存在\n%s" % video_info_data)
+    result["title"] = video_info_data["args"]["title"].encode("UTF-8")
+    # 获取视频地址
     if not crawler.check_sub_key(("url_encoded_fmt_stream_map",), video_info_data["args"]):
         raise crawler.CrawlerException("视频信息'url_encoded_fmt_stream_map'字段不存在\n%s" % video_info_data["args"])
     max_video_resolution = 0
@@ -289,8 +322,20 @@ class Youtube(crawler.Crawler):
         COOKIE_INFO = self.cookie_value
 
         # 解析存档文件
-        # account_id  video_count video_string_id  video_number_id
+        # account_id  video_string_id  video_number_id
         self.account_list = crawler.read_save_data(self.save_data_path, 0, ["", "0", "", "0"])
+
+        # 检测登录状态
+        if not check_login():
+            while True:
+                input_str = output.console_input(crawler.get_time() + " 没有检测到账号登录状态，可能无法解析受限制的视频，继续程序(C)ontinue？或者退出程序(E)xit？:")
+                input_str = input_str.lower()
+                if input_str in ["e", "exit"]:
+                    tool.process_exit()
+                elif input_str in ["c", "continue"]:
+                    global IS_LOGIN
+                    IS_LOGIN = False
+                    break
 
     def main(self):
         # 循环下载每个id
@@ -330,8 +375,8 @@ class Download(crawler.DownloadThread):
     def __init__(self, account_info, main_thread):
         crawler.DownloadThread.__init__(self, account_info, main_thread)
         self.account_id = self.account_info[0]
-        if len(self.account_info) >= 5 and self.account_info[4]:
-            self.account_name = self.account_info[4]
+        if len(self.account_info) >= 4 and self.account_info[3]:
+            self.account_name = self.account_info[3]
         else:
             self.account_name = self.account_info[0]
         log.step(self.account_name + " 开始")
@@ -341,7 +386,7 @@ class Download(crawler.DownloadThread):
         token = ""
         video_id_list = []
         # 是否有根据视频id找到上一次的记录
-        if self.account_info[2] == "":
+        if self.account_info[1] == "":
             self.is_find = True
         is_over = False
         # 获取全部还未下载过需要解析的相册
@@ -361,7 +406,7 @@ class Download(crawler.DownloadThread):
             # 寻找这一页符合条件的日志
             for video_id in blog_pagination_response["video_id_list"]:
                 # 检查是否达到存档记录
-                if video_id != self.account_info[2]:
+                if video_id != self.account_info[1]:
                     video_id_list.append(video_id)
                 else:
                     is_over = True
@@ -379,40 +424,38 @@ class Download(crawler.DownloadThread):
 
     # 解析单个视频
     def crawl_video(self, video_id):
-        video_index = int(self.account_info[1]) + 1
         # 获取指定视频信息
         try:
             video_response = get_video_page(video_id)
         except crawler.CrawlerException, e:
-            log.error(self.account_name + " 第%s个视频%s解析失败，原因：%s" % (video_index, video_id, e.message))
+            log.error(self.account_name + " 视频%s解析失败，原因：%s" % (video_id, e.message))
             raise
 
         # 如果解析需要下载的视频时没有找到上次的记录，表示存档所在的视频已被删除，则判断数字id
         if not self.is_find:
-            if video_response["video_time"] < int(self.account_info[3]):
+            if video_response["video_time"] < int(self.account_info[2]):
                 log.step(self.account_name + " 视频%s跳过" % video_id)
                 return
-            elif video_response["video_time"] == int(self.account_info[3]):
-                log.error(self.account_name + " 第%s个视频%s与存档视频发布日期一致，无法过滤，再次下载" % (video_index, video_id))
+            elif video_response["video_time"] == int(self.account_info[2]):
+                log.error(self.account_name + " 视频%s与存档视频发布日期一致，无法过滤，再次下载" % video_id)
             else:
                 self.is_find = True
 
         self.main_thread_check()  # 检测主线程运行状态
-        log.step(self.account_name + " 开始下载第%s个视频 %s" % (video_index, video_response["video_url"]))
+        log.step(self.account_name + " 开始下载视频%s 《%s》 %s" % (video_id, video_response["title"], video_response["video_url"]))
 
-        video_file_path = os.path.join(self.main_thread.video_download_path, self.account_name, "%04d.mp4" % video_index)
+        video_file_path = os.path.join(self.main_thread.video_download_path, self.account_name, "%s - %s.mp4" % (video_id, path.filter_text(video_response["title"])))
         save_file_return = net.save_net_file(video_response["video_url"], video_file_path)
         if save_file_return["status"] == 1:
             # 设置临时目录
-            log.step(self.account_name + " 第%s个视频下载成功" % video_index)
+            log.step(self.account_name + " 视频%s 《%s》下载成功" % (video_id, video_response["title"]))
         else:
-            log.error(self.account_name + " 第%s个视频（%s） %s 下载失败，原因：%s" % (video_index, video_id, video_response["video_url"], crawler.download_failre(save_file_return["code"])))
+            log.error(self.account_name + " 视频%s 《%s》 %s 下载失败，原因：%s" % (video_id, video_response["title"], video_response["video_url"], crawler.download_failre(save_file_return["code"])))
 
         # 媒体内图片和视频全部下载完毕
         self.total_video_count += 1  # 计数累加
-        self.account_info[1] = str(video_index)  # 设置存档记录
-        self.account_info[2] = video_id  # 设置存档记录
-        self.account_info[3] = str(video_response["video_time"])  # 设置存档记录
+        self.account_info[1] = video_id  # 设置存档记录
+        self.account_info[2] = str(video_response["video_time"])  # 设置存档记录
 
     def run(self):
         try:
