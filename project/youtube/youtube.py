@@ -214,6 +214,13 @@ def get_video_page(video_id):
             video_time = time.strptime(video_time_string, "%Y年%m月%d日")
         except ValueError:
             raise crawler.CrawlerException("视频发布时间文本格式不正确\n%s" % video_time_string)
+    # 日文
+    elif video_time_string.find("に公開") >= 0:
+        video_time_string = video_time_string.replace("に公開", "").strip()
+        try:
+            video_time = time.strptime(video_time_string, "%Y/%m/%d")
+        except ValueError:
+            raise crawler.CrawlerException("视频发布时间文本格式不正确\n%s" % video_time_string)
     else:
         raise crawler.CrawlerException("未知语言的时间格式\n%s" % video_time_string)
     result["video_time"] = int(time.mktime(video_time))
@@ -323,7 +330,7 @@ class Youtube(crawler.Crawler):
 
         # 解析存档文件
         # account_id  video_string_id  video_number_id
-        self.account_list = crawler.read_save_data(self.save_data_path, 0, ["", "0", "", "0"])
+        self.account_list = crawler.read_save_data(self.save_data_path, 0, ["", "", "0"])
 
         # 检测登录状态
         if not check_login():
@@ -468,7 +475,7 @@ class Download(crawler.DownloadThread):
             # 从最早的视频开始下载
             while len(video_id_list) > 0:
                 video_id = video_id_list.pop()
-                log.step(self.account_name + " 开始解析第%s个视频%s" % (int(self.account_info[1]) + 1, video_id))
+                log.step(self.account_name + " 开始解析视频%s" %  video_id)
                 self.crawl_video(video_id)
                 self.main_thread_check()  # 检测主线程运行状态
         except SystemExit, se:
