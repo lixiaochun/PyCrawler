@@ -1,7 +1,7 @@
 # -*- coding:UTF-8  -*-
 """
-美图录图片爬虫
-https://www.meitulu.com
+美图日图片爬虫
+https://www.meituri.com
 @author: hikaru
 email: hikaru870806@hotmail.com
 如有问题或建议请联系
@@ -10,25 +10,6 @@ from common import *
 import os
 import re
 import traceback
-
-
-# 获取图集首页
-def get_index_page():
-    index_url = "https://www.meitulu.com/"
-    index_response = net.http_request(index_url, method="GET")
-    result = {
-        "max_album_id": None,  # 最新图集id
-    }
-    if index_response.status != net.HTTP_RETURN_CODE_SUCCEED:
-        raise crawler.CrawlerException(crawler.request_failre(index_response.status))
-    new_album_html = tool.find_sub_string(index_response.data, '<div class="zuixin">最新发布</div>', '<div class="zuixin">名站写真</div>')
-    if not new_album_html:
-        raise crawler.CrawlerException("页面截取最新发布失败\n%s" % index_response.data)
-    album_id_find = re.findall('<a href="https://www.meitulu.com/item/(\d*).html"', new_album_html)
-    if len(album_id_find) == 0:
-        raise crawler.CrawlerException("最新发布匹配图集id失败\n%s" % new_album_html)
-    result["max_album_id"] = max(map(int, album_id_find))
-    return result
 
 
 # 获取指定一页的图集
@@ -41,9 +22,9 @@ def get_one_page_album(album_id):
     }
     while page_count <= max_page_count:
         if page_count == 1:
-            album_pagination_url = "https://www.meitulu.com/item/%s.html" % album_id
+            album_pagination_url = "http://www.meituri.com/a/%s/" % album_id
         else:
-            album_pagination_url = "https://www.meitulu.com/item/%s_%s.html" % (album_id, page_count)
+            album_pagination_url = "http://www.meituri.com/a/%s/%s.html" % (album_id, page_count)
         album_pagination_response = net.http_request(album_pagination_url, method="GET")
         if page_count == 1 and album_pagination_response.status == 404:
             result["is_delete"] = True
@@ -56,7 +37,6 @@ def get_one_page_album(album_id):
             if not album_title:
                 raise crawler.CrawlerException("标题截取失败\n%s" % album_pagination_response.data)
             result["album_title"] = album_title.strip()
-        result["album_title"] = result["album_title"].replace("・", "")  # \u30fb
         # 获取图集图片地址
         image_list_html = tool.find_sub_string(album_pagination_response.data, '<div class="content">', "</div>")
         if not image_list_html:
@@ -82,7 +62,7 @@ def get_image_url(image_url):
     return image_url.replace("/[page]", "/")
 
 
-class MeiTuLu(crawler.Crawler):
+class MeiTuRi(crawler.Crawler):
     def __init__(self):
         sys_config = {
             crawler.SYS_DOWNLOAD_IMAGE: True,
@@ -102,16 +82,7 @@ class MeiTuLu(crawler.Crawler):
         temp_path = ""
 
         try:
-            # 获取图集首页
-            try:
-                index_response = get_index_page()
-            except crawler.CrawlerException, e:
-                log.error("图集首页解析失败，原因：%s" % e.message)
-                raise
-
-            log.step("最新图集id：%s" % index_response["max_album_id"])
-
-            while album_id <= index_response["max_album_id"]:
+            while True:
                 if not self.is_running():
                     tool.process_exit(0)
                 log.step("开始解析图集%s" % album_id)
@@ -146,7 +117,10 @@ class MeiTuLu(crawler.Crawler):
 
                     file_type = image_url.split(".")[-1]
                     file_path = os.path.join(album_path, "%03d.%s" % (image_index, file_type))
-                    save_file_return = net.save_net_file(image_url, file_path, header_list={"Referer": "https://www.meitulu.com/"})
+                    header_list = {
+                        "Referer": "http://www.meituri.com/"
+                    }
+                    save_file_return = net.save_net_file(image_url, file_path, header_list=header_list)
                     if save_file_return["status"] == 1:
                         log.step("图集%s 《%s》 第%s张图片下载成功" % (album_id, album_title, image_index))
                     else:
@@ -174,4 +148,4 @@ class MeiTuLu(crawler.Crawler):
 
 
 if __name__ == "__main__":
-    MeiTuLu().main()
+    MeiTuRi().main()
