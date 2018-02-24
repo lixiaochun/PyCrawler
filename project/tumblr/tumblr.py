@@ -95,7 +95,7 @@ def get_one_page_post(account_id, page_count, is_https, is_safe_mode):
         time.sleep(5)
         log.step(account_id + "第%s页日志异常，重试" % page_count)
         return get_one_page_post(account_id, page_count, is_https, is_safe_mode)
-    elif post_pagination_response.status in [503, 504] and page_count > 1:
+    elif post_pagination_response.status in [503, 504, net.HTTP_RETURN_CODE_RETRY] and page_count > 1:
         # 服务器错误，跳过这页
         log.error(account_id + "第%s页日志无法访问，跳过" % page_count)
         return result
@@ -231,6 +231,11 @@ def get_post_page(post_url, is_safe_mode):
     if post_response.status == 429:
         time.sleep(30)
         return get_post_page(post_url, is_safe_mode)
+    elif post_response.status in [503, 504, net.HTTP_RETURN_CODE_RETRY]:
+        # 服务器错误，跳过这页
+        account_id = tool.find_sub_string(post_url, "://", ".tumblr.com")
+        log.error(account_id + " 日志 %s 无法访问，跳过" % post_url)
+        return result
     elif post_response.status != net.HTTP_RETURN_CODE_SUCCEED:
         raise crawler.CrawlerException(crawler.request_failre(post_response.status))
     post_page_head = tool.find_sub_string(post_response.data, "<head", "</head>", 3)
@@ -497,15 +502,14 @@ class Download(crawler.DownloadThread):
                     log.error(self.account_id + " 日志地址%s解析日志id失败" % post_info["post_url"])
                     tool.process_exit()
 
-                # 新增信息页导致的重复判断
-                if post_id in unique_list:
-                    continue
-                else:
-                    unique_list.append(post_id)
-
                 # 检查是否达到存档记录
                 if int(post_id) > int(self.account_info[1]):
-                    post_info_list.append(post_info)
+                    # 新增信息页导致的重复判断
+                    if post_id in unique_list:
+                        continue
+                    else:
+                        post_info_list.append(post_info)
+                        unique_list.append(post_id)
                 else:
                     is_over = True
                     break
