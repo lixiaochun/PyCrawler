@@ -36,6 +36,7 @@ def check_login():
 def get_one_page_video(account_id, token):
     # token = "4qmFsgJAEhhVQ2xNXzZHRU9razY2STFfWWJTUFFqSWcaJEVnWjJhV1JsYjNNZ0FEZ0JZQUZxQUhvQk1yZ0JBQSUzRCUzRA%3D%3D"
     result = {
+        "account_name": None, # 账号名字
         "video_id_list": [],  # 全部视频id
         "next_page_token": None,  # 下一页token
     }
@@ -53,6 +54,7 @@ def get_one_page_video(account_id, token):
         if index_response.data.find('<button id="a11y-skip-nav" class="skip-nav"') >= 0:
             log.step("首页访问出现跳转，再次访问")
             return get_one_page_video(account_id, token)
+        result["account_name"] = tool.find_sub_string(index_response.data, '<meta property="og:title" content="', '">').replace("- YouTube", "").strip()
         if index_response.data.find('{"alertRenderer":{"type":"ERROR",') != -1:
             reason = tool.find_sub_string(tool.find_sub_string(index_response.data, '{"alertRenderer":{"type":"ERROR",', '}],'), '{"simpleText":"', '"}')
             if reason == "This channel does not exist.":
@@ -185,7 +187,14 @@ def get_video_page(video_id):
                 # 解析JS文件，获取对应的加密方法
                 if len(decrypt_function_step) == 0:
                     js_file_name = tool.find_sub_string(video_play_response.data, 'src="/yts/jsbin/player-', '/base.js"')
-                    js_file_url = "https://www.youtube.com/yts/jsbin/player-%s/base.js" % js_file_name
+                    if js_file_name:
+                        js_file_url = "https://www.youtube.com/yts/jsbin/player-%s/base.js" % js_file_name
+                    else:
+                        js_file_name = tool.find_sub_string(video_play_response.data, 'src="https://s.ytimg.com/yts/jsbin/player-', '/base.js"')
+                        if js_file_name:
+                            js_file_url = "https://s.ytimg.com/yts/jsbin/player-%s/base.js" % js_file_name
+                        else:
+                            raise crawler.CrawlerException("播放器JS文件地址截取失败\n%s" % video_play_response.data)
                     decrypt_function_step = get_decrypt_step(js_file_url)
                     log.trace("JS文件 %s 解析出的本地加密方法\n%s" % (js_file_url, decrypt_function_step))
                 # 生成加密字符串
@@ -263,6 +272,8 @@ def get_decrypt_step(js_file_url):
     main_function_name = tool.find_sub_string(js_file_response.data, 'var l=k.sig;l?f.set("signature",l):k.s&&f.set("signature",', "(k.s));")
     if not main_function_name:
         main_function_name = tool.find_sub_string(js_file_response.data, 'if(k.url){f=new g.QJ(k.url);k.s&&f.set(k.sp||"signature",', "(k.s));")
+    if not main_function_name:
+        main_function_name = tool.find_sub_string(js_file_response.data, 'c&&(b||(b="signature"),d.set(b,', "(c))")
     if not main_function_name:
         raise crawler.CrawlerException("播放器JS文件 %s，加密方法名截取失败" % js_file_url)
     # 加密方法体（包含子加密方法的调用参数&顺序）
@@ -428,6 +439,11 @@ class Download(crawler.DownloadThread):
                 raise
 
             log.trace(self.account_name + " 视频页（token：%s）解析的全部日志：%s" % (token, blog_pagination_response["video_id_list"]))
+
+            if len(self.account_info) < 4:
+                log.step(self.account_name + " 频道名：%s" % blog_pagination_response["account_name"])
+                self.account_name = blog_pagination_response["account_name"]
+                self.account_info.append(self.account_name)
 
             # 寻找这一页符合条件的日志
             for video_id in blog_pagination_response["video_id_list"]:
