@@ -42,6 +42,9 @@ def get_album_photo(album_id):
     while page_count <= max_page_count:
         album_pagination_url = "http://www.youzi4.cc/mm/%s/%s_%s.html" % (album_id, album_id, page_count)
         album_pagination_response = net.http_request(album_pagination_url, method="GET")
+        if album_pagination_response.status == 404 and page_count == 1:
+            result["is_delete"] = True
+            return result
         if album_pagination_response.status != net.HTTP_RETURN_CODE_SUCCEED:
             raise crawler.CrawlerException("第%s页 " % page_count + crawler.request_failre(album_pagination_response.status))
         # 判断图集是否已经被删除
@@ -65,7 +68,7 @@ def get_album_photo(album_id):
                 if crawler.is_integer(temp_page_count):
                     max_page_count = max(int(temp_page_count), max_page_count)
         else:
-            if page_count > 0:
+            if page_count > 1:
                 raise crawler.CrawlerException("第%s页 页面匹配分页信息失败\n%s" % (page_count, album_pagination_response.data))
         page_count += 1
     return result
@@ -123,9 +126,9 @@ class YouZi(crawler.Crawler):
                 # 过滤标题中不支持的字符
                 album_title = path.filter_text(album_pagination_response["album_title"])
                 if album_title:
-                    album_path = os.path.join(self.image_download_path, "%s %s" % (album_id, album_title))
+                    album_path = os.path.join(self.image_download_path, "%05d %s" % (album_id, album_title))
                 else:
-                    album_path = os.path.join(self.image_download_path, str(album_id))
+                    album_path = os.path.join(self.image_download_path, "%05d" % (album_id))
                 temp_path = album_path
                 for image_url in album_pagination_response["image_url_list"]:
                     if not self.is_running():
