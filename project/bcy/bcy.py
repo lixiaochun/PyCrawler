@@ -221,7 +221,6 @@ class Bcy(crawler.Crawler):
             crawler.SYS_DOWNLOAD_IMAGE: True,
             crawler.SYS_GET_COOKIE: {".bcy.net": ("LOGGED_USER",)},
             crawler.SYS_APP_CONFIG: (
-                os.path.realpath("config.ini"),
                 ("IS_AUTO_FOLLOW", True, crawler.CONFIG_ANALYSIS_MODE_BOOLEAN),
                 ("IS_LOCAL_SAVE_SESSION", False, crawler.CONFIG_ANALYSIS_MODE_BOOLEAN)
             ),
@@ -358,6 +357,7 @@ class Download(crawler.DownloadThread):
         # 是不是已被管理员锁定
         if album_response["is_admin_locked"]:
             log.error(self.account_name + " 作品%s 《%s》已被管理员锁定，跳过" % (album_info["album_id"], album_info["album_title"]))
+            self.account_info[1] = album_info["album_id"]  # 设置存档记录
             return
 
         # 是不是只对登录账号可见
