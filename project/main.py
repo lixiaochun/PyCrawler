@@ -127,6 +127,14 @@ def meitulu():
     meitulu.MeiTuLu().main()
 
 
+# 美图日
+def meituri():
+    from meituri import meituri
+    meituri_path = os.path.join(ROOT_PATH, "meituri")
+    os.chdir(meituri_path)
+    meituri.MeiTuRi().main()
+
+
 # 美图赚赚
 def meituzz():
     from meituzz import meituzz
@@ -269,6 +277,13 @@ def yizhibo():
     yizhibo.YiZhiBo().main()
 
 
+# 优姿
+def youzi():
+    from youzi import youzi
+    youzi_path = os.path.join(ROOT_PATH, "youzi")
+    os.chdir(youzi_path)
+    youzi.YouZi().main()
+
 # ameblo()
 # bcy()
 # chang_ba()
@@ -283,6 +298,7 @@ def yizhibo():
 # lofter()
 # meipai()
 # meitulu()
+# meituri()
 # meituzz()
 # miaopai()
 # nana_go_go()
@@ -298,5 +314,6 @@ def yizhibo():
 # weibo()
 # weibo_article()
 # yizhibo()
+# youzi()
 # from common import tool
 # tool.shutdown()
