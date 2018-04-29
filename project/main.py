@@ -207,7 +207,7 @@ def tumblr():
     tumblr.Tumblr().main()
 
 
-# # Twitter
+# Twitter
 def twitter():
     from twitter import twitter
     twitter_path = os.path.join(ROOT_PATH, "twitter")
